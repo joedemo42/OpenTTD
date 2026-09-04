@@ -12,7 +12,7 @@ PROBE_ROOT="$SCRIPT_DIR/probes"
 IOS_MIN_VERSION="${IOS_MIN_VERSION:-26.0}"
 
 readonly SDKS=(iphoneos iphonesimulator)
-readonly DEPENDENCIES=(sdl3 zlib xz)
+readonly DEPENDENCIES=(sdl3 zlib xz libpng)
 
 SDL3_VERSION="3.4.10"
 SDL3_ARCHIVE="SDL3-${SDL3_VERSION}.tar.gz"
@@ -28,6 +28,11 @@ XZ_VERSION="5.8.3"
 XZ_ARCHIVE="xz-${XZ_VERSION}.tar.gz"
 XZ_URL="https://github.com/tukaani-project/xz/releases/download/v${XZ_VERSION}/${XZ_ARCHIVE}"
 XZ_SHA256="3d3a1b973af218114f4f889bbaa2f4c037deaae0c8e815eec381c3d546b974a0"
+
+LIBPNG_VERSION="1.6.58"
+LIBPNG_ARCHIVE="libpng-${LIBPNG_VERSION}.tar.gz"
+LIBPNG_URL="https://download.sourceforge.net/libpng/${LIBPNG_ARCHIVE}"
+LIBPNG_SHA256="8c9b05b675ca7301a458df2c2e46f26e1d41ff36b8863f8c33530bc58c2e6225"
 
 usage()
 {
@@ -343,12 +348,77 @@ probe_xz()
 	probe_cmake_package xz lib/cmake/liblzma xz
 }
 
+build_libpng()
+{
+	[[ -f "$BUILD_ROOT/zlib/install/iphoneos/lib/libz.a" && \
+		-f "$BUILD_ROOT/zlib/install/iphonesimulator/lib/libz.a" ]] || build_zlib
+	download_archive "$LIBPNG_ARCHIVE" "$LIBPNG_URL" "$LIBPNG_SHA256"
+	prepare_source libpng "$LIBPNG_ARCHIVE" "$LIBPNG_SHA256" "libpng-$LIBPNG_VERSION"
+
+	local sdk
+	for sdk in "${SDKS[@]}"; do
+		local dependency_root="$BUILD_ROOT/libpng"
+		local install_prefix="$dependency_root/install/$sdk"
+		local build_directory="$dependency_root/$sdk"
+		local zlib_prefix="$BUILD_ROOT/zlib/install/$sdk"
+		local arguments=()
+		while IFS= read -r argument; do
+			arguments+=("$argument")
+		done < <(cmake_ios_arguments "$sdk" "$install_prefix")
+
+		cmake -S "$dependency_root/src" -B "$build_directory" \
+			"${arguments[@]}" \
+			-UPNG_EXECUTABLES \
+			-DPNG_FRAMEWORK=OFF \
+			-DPNG_SHARED=OFF \
+			-DPNG_STATIC=ON \
+			-DPNG_TESTS=OFF \
+			-DPNG_TOOLS=OFF \
+			-DZLIB_INCLUDE_DIR="$zlib_prefix/include" \
+			-DZLIB_LIBRARY="$zlib_prefix/lib/libz.a" \
+			-DZLIB_LIBRARY_RELEASE="$zlib_prefix/lib/libz.a" \
+			-DZLIB_ROOT="$zlib_prefix" \
+			-DZLIB_USE_STATIC_LIBS=ON
+		cmake --build "$build_directory" --target install --parallel
+		lipo -info "$install_prefix/lib/libpng16.a" | grep -q 'arm64' || fail "libpng $sdk archive is not arm64"
+		grep -Fq "$zlib_prefix/lib/libz.a" "$build_directory/CMakeCache.txt" || fail "libpng $sdk did not bind to the matching zlib slice"
+	done
+
+	create_xcframework libpng libpng16.a LibPNG
+	probe_libpng
+}
+
+probe_libpng()
+{
+	local sdk
+	for sdk in "${SDKS[@]}"; do
+		local dependency_root="$BUILD_ROOT/libpng"
+		local install_prefix="$dependency_root/install/$sdk"
+		local zlib_prefix="$BUILD_ROOT/zlib/install/$sdk"
+		local probe_build="$dependency_root/probe/$sdk"
+		local arguments=()
+		while IFS= read -r argument; do
+			arguments+=("$argument")
+		done < <(cmake_ios_arguments "$sdk" "$install_prefix")
+
+		cmake -S "$PROBE_ROOT/libpng" -B "$probe_build" \
+			"${arguments[@]}" \
+			-DLIBPNG_PREFIX="$install_prefix" \
+			-DZLIB_PREFIX="$zlib_prefix"
+		cmake --build "$probe_build" --parallel
+		local probe_binary="$probe_build/dependency-probe.app/dependency-probe"
+		[[ -f "$probe_binary" ]] || fail "libpng $sdk probe binary was not produced"
+		file "$probe_binary" | grep -q 'arm64' || fail "libpng $sdk probe is not arm64"
+	done
+}
+
 build_dependency()
 {
 	case "$1" in
 		sdl3) build_sdl3 ;;
 		zlib) build_zlib ;;
 		xz) build_xz ;;
+		libpng) build_libpng ;;
 		*) fail "no builder for dependency: $1" ;;
 	esac
 }
@@ -359,6 +429,7 @@ verify_dependency()
 		sdl3) probe_sdl3 ;;
 		zlib) probe_zlib ;;
 		xz) probe_xz ;;
+		libpng) probe_libpng ;;
 		*) fail "no verifier for dependency: $1" ;;
 	esac
 }
@@ -407,6 +478,7 @@ case "$command" in
 			sdl3) rm -rf "$ARTIFACT_ROOT/SDL3.xcframework" ;;
 			zlib) rm -rf "$ARTIFACT_ROOT/Zlib.xcframework" ;;
 			xz) rm -rf "$ARTIFACT_ROOT/LibLZMA.xcframework" ;;
+			libpng) rm -rf "$ARTIFACT_ROOT/LibPNG.xcframework" ;;
 		esac
 		;;
 	list)
@@ -414,6 +486,7 @@ case "$command" in
 		echo "sdl3 $SDL3_VERSION"
 		echo "zlib $ZLIB_VERSION"
 		echo "xz $XZ_VERSION"
+		echo "libpng $LIBPNG_VERSION"
 		;;
 	*)
 		usage
