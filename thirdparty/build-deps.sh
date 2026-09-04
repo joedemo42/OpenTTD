@@ -12,7 +12,7 @@ PROBE_ROOT="$SCRIPT_DIR/probes"
 IOS_MIN_VERSION="${IOS_MIN_VERSION:-26.0}"
 
 readonly SDKS=(iphoneos iphonesimulator)
-readonly DEPENDENCIES=(sdl3 zlib xz libpng)
+readonly DEPENDENCIES=(sdl3 zlib xz libpng lzo)
 
 SDL3_VERSION="3.4.10"
 SDL3_ARCHIVE="SDL3-${SDL3_VERSION}.tar.gz"
@@ -33,6 +33,11 @@ LIBPNG_VERSION="1.6.58"
 LIBPNG_ARCHIVE="libpng-${LIBPNG_VERSION}.tar.gz"
 LIBPNG_URL="https://download.sourceforge.net/libpng/${LIBPNG_ARCHIVE}"
 LIBPNG_SHA256="8c9b05b675ca7301a458df2c2e46f26e1d41ff36b8863f8c33530bc58c2e6225"
+
+LZO_VERSION="2.10"
+LZO_ARCHIVE="lzo-${LZO_VERSION}.tar.gz"
+LZO_URL="https://www.oberhumer.com/opensource/lzo/download/${LZO_ARCHIVE}"
+LZO_SHA256="c0f892943208266f9b6543b3ae308fab6284c5c90e627931446fb49b4221a072"
 
 usage()
 {
@@ -412,6 +417,59 @@ probe_libpng()
 	done
 }
 
+build_lzo()
+{
+	download_archive "$LZO_ARCHIVE" "$LZO_URL" "$LZO_SHA256"
+	prepare_source lzo "$LZO_ARCHIVE" "$LZO_SHA256" "lzo-$LZO_VERSION"
+
+	local sdk
+	for sdk in "${SDKS[@]}"; do
+		local dependency_root="$BUILD_ROOT/lzo"
+		local install_prefix="$dependency_root/install/$sdk"
+		local build_directory="$dependency_root/$sdk"
+		local arguments=()
+		while IFS= read -r argument; do
+			arguments+=("$argument")
+		done < <(cmake_ios_arguments "$sdk" "$install_prefix")
+
+		cmake -S "$dependency_root/src" -B "$build_directory" \
+			"${arguments[@]}" \
+			-DCMAKE_POLICY_VERSION_MINIMUM=3.5 \
+			-DENABLE_SHARED=OFF \
+			-DENABLE_STATIC=ON
+		cmake --build "$build_directory" --target lzo_static_lib --parallel
+		mkdir -p "$install_prefix/lib" "$install_prefix/include"
+		cmake -E copy_if_different "$build_directory/liblzo2.a" "$install_prefix/lib/liblzo2.a"
+		cmake -E copy_directory "$dependency_root/src/include/lzo" "$install_prefix/include/lzo"
+		lipo -info "$install_prefix/lib/liblzo2.a" | grep -q 'arm64' || fail "LZO $sdk archive is not arm64"
+	done
+
+	create_xcframework lzo liblzo2.a LZO
+	probe_lzo
+}
+
+probe_lzo()
+{
+	local sdk
+	for sdk in "${SDKS[@]}"; do
+		local dependency_root="$BUILD_ROOT/lzo"
+		local install_prefix="$dependency_root/install/$sdk"
+		local probe_build="$dependency_root/probe/$sdk"
+		local arguments=()
+		while IFS= read -r argument; do
+			arguments+=("$argument")
+		done < <(cmake_ios_arguments "$sdk" "$install_prefix")
+
+		cmake -S "$PROBE_ROOT/lzo" -B "$probe_build" \
+			"${arguments[@]}" \
+			-DLZO_PREFIX="$install_prefix"
+		cmake --build "$probe_build" --parallel
+		local probe_binary="$probe_build/dependency-probe.app/dependency-probe"
+		[[ -f "$probe_binary" ]] || fail "LZO $sdk probe binary was not produced"
+		file "$probe_binary" | grep -q 'arm64' || fail "LZO $sdk probe is not arm64"
+	done
+}
+
 build_dependency()
 {
 	case "$1" in
@@ -419,6 +477,7 @@ build_dependency()
 		zlib) build_zlib ;;
 		xz) build_xz ;;
 		libpng) build_libpng ;;
+		lzo) build_lzo ;;
 		*) fail "no builder for dependency: $1" ;;
 	esac
 }
@@ -430,6 +489,7 @@ verify_dependency()
 		zlib) probe_zlib ;;
 		xz) probe_xz ;;
 		libpng) probe_libpng ;;
+		lzo) probe_lzo ;;
 		*) fail "no verifier for dependency: $1" ;;
 	esac
 }
@@ -479,6 +539,7 @@ case "$command" in
 			zlib) rm -rf "$ARTIFACT_ROOT/Zlib.xcframework" ;;
 			xz) rm -rf "$ARTIFACT_ROOT/LibLZMA.xcframework" ;;
 			libpng) rm -rf "$ARTIFACT_ROOT/LibPNG.xcframework" ;;
+			lzo) rm -rf "$ARTIFACT_ROOT/LZO.xcframework" ;;
 		esac
 		;;
 	list)
@@ -487,6 +548,7 @@ case "$command" in
 		echo "zlib $ZLIB_VERSION"
 		echo "xz $XZ_VERSION"
 		echo "libpng $LIBPNG_VERSION"
+		echo "lzo $LZO_VERSION"
 		;;
 	*)
 		usage
