@@ -61,6 +61,8 @@ require_artifacts()
 		[[ -d "$REPO_ROOT/thirdparty/artifacts/$artifact.xcframework" ]] || \
 			fail "missing $artifact.xcframework; run thirdparty/build-deps.sh build all"
 	done
+	[[ -d "$REPO_ROOT/thirdparty/artifacts/TimGM6mb" ]] || \
+		fail "missing TimGM6mb SoundFont; run thirdparty/build-deps.sh build timgm6mb"
 }
 
 require_engine_artifact()
@@ -305,6 +307,9 @@ verify_bundled_data()
 	[[ -f "$app/SeedData/baseset/opengfx-8.0.tar" ]] || fail "built app is missing bundled OpenGFX"
 	[[ -f "$app/SeedData/baseset/opensfx-1.0.3.tar" ]] || fail "built app is missing bundled OpenSFX"
 	[[ -f "$app/SeedData/baseset/openmsx-0.4.2/openmsx.obm" ]] || fail "built app is missing bundled OpenMSX"
+	[[ -f "$app/SeedData/baseset/timgm6mb/TimGM6mb.sf2" ]] || fail "built app is missing bundled TimGM6mb"
+	[[ -f "$app/SeedData/baseset/timgm6mb/LICENSE.txt" ]] || fail "built app is missing the TimGM6mb copyright notice"
+	[[ -f "$app/SeedData/baseset/timgm6mb/COPYING.md" ]] || fail "built app is missing the TimGM6mb GPL-2 license"
 }
 
 install_app()
@@ -361,6 +366,9 @@ prepare_data()
 	local fingerprint
 	fingerprint="documents-root-v1:$(shasum -a 256 \
 		"$REPO_ROOT"/Data/*.zip \
+		"$REPO_ROOT"/thirdparty/artifacts/TimGM6mb/TimGM6mb.sf2 \
+		"$REPO_ROOT"/thirdparty/artifacts/TimGM6mb/LICENSE.txt \
+		"$REPO_ROOT"/thirdparty/artifacts/TimGM6mb/COPYING.md \
 		"$SOURCE_DIR/media/baseset/openttd.grf" \
 		"$SOURCE_DIR/media/baseset/opntitle.dat" \
 		"$SOURCE_DIR/media/baseset/orig_extra.grf" \
@@ -379,6 +387,7 @@ prepare_data()
 	local seed="$temporary/SeedData"
 	mkdir -p \
 		"$seed/baseset" \
+		"$seed/baseset/timgm6mb" \
 		"$seed/lang" \
 		"$seed/ai/library" \
 		"$seed/game/library" \
@@ -393,6 +402,11 @@ prepare_data()
 		"$seed/baseset/opensfx-1.0.3.tar"
 	unzip -p "$REPO_ROOT/Data/openmsx-0.4.2-all.zip" '*.tar' | \
 		tar -xf - -C "$seed/baseset"
+	cp \
+		"$REPO_ROOT/thirdparty/artifacts/TimGM6mb/TimGM6mb.sf2" \
+		"$REPO_ROOT/thirdparty/artifacts/TimGM6mb/LICENSE.txt" \
+		"$REPO_ROOT/thirdparty/artifacts/TimGM6mb/COPYING.md" \
+		"$seed/baseset/timgm6mb/"
 	cp \
 		"$SOURCE_DIR/media/baseset/openttd.grf" \
 		"$SOURCE_DIR/media/baseset/opntitle.dat" \
@@ -426,6 +440,9 @@ create_data_zip()
 	[[ "$entries" == *"Documents/baseset/opengfx-8.0.tar"* ]] || fail "Documents ZIP is missing OpenGFX"
 	[[ "$entries" == *"Documents/baseset/opensfx-1.0.3.tar"* ]] || fail "Documents ZIP is missing OpenSFX"
 	[[ "$entries" == *"Documents/baseset/openmsx-0.4.2/openmsx.obm"* ]] || fail "Documents ZIP is missing OpenMSX"
+	[[ "$entries" == *"Documents/baseset/timgm6mb/TimGM6mb.sf2"* ]] || fail "Documents ZIP is missing TimGM6mb"
+	[[ "$entries" == *"Documents/baseset/timgm6mb/LICENSE.txt"* ]] || fail "Documents ZIP is missing the TimGM6mb copyright notice"
+	[[ "$entries" == *"Documents/baseset/timgm6mb/COPYING.md"* ]] || fail "Documents ZIP is missing the TimGM6mb GPL-2 license"
 	echo "Created $output"
 }
 
@@ -439,6 +456,8 @@ verify_data()
 	[[ ! -e "$SEED_DATA/OpenTTD" ]] || fail "staged data contains a forbidden OpenTTD wrapper directory"
 	[[ -d "$SEED_DATA/save/autosave" ]] || fail "staged data is missing save/autosave"
 	[[ -d "$SEED_DATA/scenario/heightmap" ]] || fail "staged data is missing scenario/heightmap"
+	[[ "$(shasum -a 256 "$SEED_DATA/baseset/timgm6mb/TimGM6mb.sf2" | awk '{print $1}')" == \
+		"c5378b62028c920cb11e4803327983fee2f2cdff5dc89c708e39da417e51c854" ]] || fail "staged TimGM6mb checksum mismatch"
 
 	local build_directory="$ENGINE_ROOT/host-tests"
 	cmake -S "$SOURCE_DIR" -B "$build_directory" -G Ninja \
@@ -499,10 +518,32 @@ test_simulator()
 	install_app simulator "$simulator"
 	mkdir -p "$LOG_DIR"
 	xcrun simctl launch --terminate-running-process --console "$simulator" "$BUNDLE_ID" \
-		-s ios -S OpenSFX -d driver=1,misc=1 \
+		-s ios -S OpenSFX -M OpenMSX -d driver=1,misc=1 \
 		> "$LOG_DIR/debugger.log" 2>&1 &
 	local console_pid=$!
-	sleep "$seconds"
+	local launch_wait=0
+	while ! grep -Fq 'IOS_ENGINE START revision=' "$LOG_DIR/debugger.log"; do
+		if ! kill -0 "$console_pid" 2>/dev/null; then
+			wait "$console_pid" 2>/dev/null || true
+			fail "simulator app exited before the engine started"
+		fi
+		if (( launch_wait >= 30 )); then
+			kill -KILL "$console_pid" 2>/dev/null || true
+			wait "$console_pid" 2>/dev/null || true
+			fail "simulator engine did not start within 30 seconds"
+		fi
+		sleep 1
+		launch_wait=$((launch_wait + 1))
+	done
+	if (( seconds >= 15 )); then
+		sleep 10
+		xcrun simctl launch "$simulator" com.apple.Preferences >/dev/null
+		sleep 3
+		xcrun simctl launch "$simulator" "$BUNDLE_ID" >/dev/null
+		sleep $((seconds - 13))
+	else
+		sleep "$seconds"
+	fi
 	xcrun simctl io "$simulator" screenshot "$LOG_DIR/skeleton.png"
 	xcrun simctl spawn "$simulator" log show --last 2m --style compact \
 		--predicate 'process == "OpenTTD"' > "$LOG_DIR/simulator.log"
@@ -532,12 +573,27 @@ test_simulator()
 		fail "OpenSFX selection marker missing from simulator log"
 	grep -Fq 'IOS_AUDIO CALLBACK active=yes' "$LOG_DIR/simulator.log" || \
 		fail "SDL3 audio callback marker missing from simulator log"
+	grep -F 'IOS_MUSIC READY synth=midisynth' "$LOG_DIR/simulator.log" | grep -Fq 'music_set=OpenMSX' || \
+		fail "native MIDI/OpenMSX readiness marker missing from simulator log"
+	grep -Fq 'IOS_MUSIC PLAY ' "$LOG_DIR/simulator.log" || \
+		fail "native MIDI play marker missing from simulator log"
+	grep -Fq 'IOS_MUSIC PLAYBACK active=yes' "$LOG_DIR/simulator.log" || \
+		fail "native MIDI playback marker missing from simulator log"
+	if (( seconds >= 15 )); then
+		grep -Fq 'IOS_MUSIC LIFECYCLE background' "$LOG_DIR/simulator.log" || \
+			fail "native MIDI background marker missing from simulator log"
+		grep -Fq 'IOS_MUSIC LIFECYCLE foreground' "$LOG_DIR/simulator.log" || \
+			fail "native MIDI foreground marker missing from simulator log"
+	fi
 	local container
 	container="$(xcrun simctl get_app_container "$simulator" "$BUNDLE_ID" data)"
 	[[ ! -e "$container/Documents/OpenTTD" ]] || fail "simulator contains the forbidden Documents/OpenTTD wrapper"
 	[[ -f "$container/Documents/baseset/opengfx-8.0.tar" ]] || fail "OpenGFX was not seeded into Documents/baseset"
 	[[ -f "$container/Documents/baseset/opensfx-1.0.3.tar" ]] || fail "OpenSFX was not seeded into Documents/baseset"
 	[[ -f "$container/Documents/baseset/openmsx-0.4.2/openmsx.obm" ]] || fail "OpenMSX was not seeded into Documents/baseset"
+	[[ -f "$container/Documents/baseset/timgm6mb/TimGM6mb.sf2" ]] || fail "TimGM6mb was not seeded into Documents/baseset"
+	[[ -f "$container/Documents/baseset/timgm6mb/LICENSE.txt" ]] || fail "TimGM6mb copyright notice was not seeded"
+	[[ -f "$container/Documents/baseset/timgm6mb/COPYING.md" ]] || fail "TimGM6mb GPL-2 license was not seeded"
 	echo "Simulator engine test passed; logs and screenshot are in $LOG_DIR"
 }
 
@@ -550,7 +606,7 @@ test_device()
 	mkdir -p "$LOG_DIR"
 	local console_timeout=$((seconds + 60))
 	xcrun devicectl device process launch --terminate-existing --console --timeout "$console_timeout" \
-		--device "$selector" "$BUNDLE_ID" -s ios -S OpenSFX -d driver=1,misc=1 \
+		--device "$selector" "$BUNDLE_ID" -s ios -S OpenSFX -M OpenMSX -d driver=1,misc=1 \
 		> "$LOG_DIR/device-debugger.log" 2>&1 &
 	local console_pid=$!
 	local launch_wait=0
@@ -596,6 +652,12 @@ test_device()
 		fail "OpenSFX selection marker missing from device console"
 	grep -Fq 'IOS_AUDIO CALLBACK active=yes' "$LOG_DIR/device-debugger.log" || \
 		fail "SDL3 audio callback marker missing from device console"
+	grep -F 'IOS_MUSIC READY synth=midisynth' "$LOG_DIR/device-debugger.log" | grep -Fq 'music_set=OpenMSX' || \
+		fail "native MIDI/OpenMSX readiness marker missing from device console"
+	grep -Fq 'IOS_MUSIC PLAY ' "$LOG_DIR/device-debugger.log" || \
+		fail "native MIDI play marker missing from device console"
+	grep -Fq 'IOS_MUSIC PLAYBACK active=yes' "$LOG_DIR/device-debugger.log" || \
+		fail "native MIDI playback marker missing from device console"
 	echo "Device engine test passed for $seconds seconds after startup; console output is in $LOG_DIR/device-debugger.log"
 }
 
