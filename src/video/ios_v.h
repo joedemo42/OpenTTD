@@ -10,6 +10,7 @@
 #ifndef VIDEO_IOS_H
 #define VIDEO_IOS_H
 
+#include "ios_input.h"
 #include "video_driver.hpp"
 
 #include <SDL3/SDL.h>
@@ -26,6 +27,8 @@ public:
 	bool ToggleFullscreen(bool fullscreen) override;
 	void ToggleVsync(bool vsync) override;
 	bool AfterBlitterChange() override;
+	void EditBoxGainedFocus() override;
+	void EditBoxLostFocus() override;
 	std::string_view GetName() const override { return "ios"; }
 	std::string_view GetInfoString() const override { return this->driver_info; }
 
@@ -34,6 +37,7 @@ protected:
 	bool LockVideoBuffer() override;
 	void UnlockVideoBuffer() override;
 	void CheckPaletteAnim() override;
+	void InputLoop() override;
 	bool PollEvent() override;
 	void Paint() override;
 
@@ -43,6 +47,17 @@ private:
 	std::optional<std::string_view> StartFailure(std::string error);
 	bool UpdateLayout(bool force);
 	void HandleLifecycleEvent(Uint32 event_type);
+	OpenTTDIOSInput::LogicalPoint GetLogicalPoint(float x, float y) const;
+	OpenTTDIOSInput::LogicalPoint GetLogicalTouchPoint(float x, float y) const;
+	void MoveCursor(const OpenTTDIOSInput::LogicalPoint &point, bool dispatch = true);
+	void HandleMouseMotion(const SDL_MouseMotionEvent &event);
+	void HandleMouseButton(const SDL_MouseButtonEvent &event);
+	void HandleMouseWheel(const SDL_MouseWheelEvent &event);
+	void HandleKeyDown(const SDL_KeyboardEvent &event);
+	void HandleTouch(const SDL_TouchFingerEvent &event);
+	void HandleGestureActions(const OpenTTDIOSInput::GestureActions &actions);
+	void UpdateTextInputArea();
+	void CancelTouchInput();
 
 	SDL_Window *window = nullptr;
 	SDL_Renderer *renderer = nullptr;
@@ -52,13 +67,21 @@ private:
 	Rect dirty_rect{};
 	std::string driver_info{};
 	std::string startup_error{};
+	OpenTTDIOSInput::GestureState touch_gesture{};
+	OpenTTDIOSInput::PinchAccumulator pinch_gesture{};
+	SDL_Rect text_input_area{};
 	int window_width = 0;
 	int window_height = 0;
 	int safe_x = 0;
 	int safe_y = 0;
+	int text_input_cursor = 0;
+	float touch_pan_remainder_x = 0;
+	float touch_pan_remainder_y = 0;
 	bool buffer_locked = false;
 	bool event_watch_installed = false;
 	bool logged_first_present = false;
+	bool edit_box_focused = false;
+	bool text_input_area_valid = false;
 	std::atomic<bool> backgrounded = false;
 	std::atomic<bool> redraw_requested = false;
 };

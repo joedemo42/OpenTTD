@@ -28,6 +28,7 @@ if(NOT OPTION_DEDICATED)
     )
 
     add_files(
+        ios_input.h
         ios_v.cpp
         ios_v.h
         CONDITION IOS

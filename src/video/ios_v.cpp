@@ -15,18 +15,113 @@
 #include "../gfx_func.h"
 #include "../openttd.h"
 #include "../progress.h"
+#include "../string_func.h"
+#include "../viewport_func.h"
 #include "../window_func.h"
+#include "../window_gui.h"
 #include "ios_v.h"
 
 #include "../safeguards.h"
 
 static FVideoDriver_iOS iFVideoDriver_iOS;
 
+namespace {
+
+struct SDLKeyMapping {
+	SDL_Keycode first;
+	SDL_Keycode last;
+	WindowKeyCodes mapped;
+	bool unprintable;
+};
+
+static constexpr SDLKeyMapping _key_mapping[] = {
+	{SDLK_PAGEUP, SDLK_PAGEUP, WKC_PAGEUP, true},
+	{SDLK_PAGEDOWN, SDLK_PAGEDOWN, WKC_PAGEDOWN, true},
+	{SDLK_UP, SDLK_UP, WKC_UP, true},
+	{SDLK_DOWN, SDLK_DOWN, WKC_DOWN, true},
+	{SDLK_LEFT, SDLK_LEFT, WKC_LEFT, true},
+	{SDLK_RIGHT, SDLK_RIGHT, WKC_RIGHT, true},
+	{SDLK_HOME, SDLK_HOME, WKC_HOME, true},
+	{SDLK_END, SDLK_END, WKC_END, true},
+	{SDLK_INSERT, SDLK_INSERT, WKC_INSERT, true},
+	{SDLK_DELETE, SDLK_DELETE, WKC_DELETE, true},
+	{SDLK_ESCAPE, SDLK_ESCAPE, WKC_ESC, true},
+	{SDLK_PAUSE, SDLK_PAUSE, WKC_PAUSE, true},
+	{SDLK_BACKSPACE, SDLK_BACKSPACE, WKC_BACKSPACE, true},
+	{SDLK_F1, SDLK_F12, WKC_F1, true},
+	{SDLK_A, SDLK_Z, WindowKeyCodes{'A'}, false},
+	{SDLK_0, SDLK_9, WindowKeyCodes{'0'}, false},
+	{SDLK_SPACE, SDLK_SPACE, WKC_SPACE, false},
+	{SDLK_RETURN, SDLK_RETURN, WKC_RETURN, false},
+	{SDLK_TAB, SDLK_TAB, WKC_TAB, false},
+	{SDLK_KP_1, SDLK_KP_9, WindowKeyCodes{'1'}, false},
+	{SDLK_KP_0, SDLK_KP_0, WindowKeyCodes{'0'}, false},
+	{SDLK_KP_DIVIDE, SDLK_KP_DIVIDE, WKC_NUM_DIV, false},
+	{SDLK_KP_MULTIPLY, SDLK_KP_MULTIPLY, WKC_NUM_MUL, false},
+	{SDLK_KP_MINUS, SDLK_KP_MINUS, WKC_NUM_MINUS, false},
+	{SDLK_KP_PLUS, SDLK_KP_PLUS, WKC_NUM_PLUS, false},
+	{SDLK_KP_ENTER, SDLK_KP_ENTER, WKC_NUM_ENTER, false},
+	{SDLK_KP_PERIOD, SDLK_KP_PERIOD, WKC_NUM_DECIMAL, false},
+	{SDLK_SLASH, SDLK_SLASH, WKC_SLASH, false},
+	{SDLK_SEMICOLON, SDLK_SEMICOLON, WKC_SEMICOLON, false},
+	{SDLK_EQUALS, SDLK_EQUALS, WKC_EQUALS, false},
+	{SDLK_LEFTBRACKET, SDLK_LEFTBRACKET, WKC_L_BRACKET, false},
+	{SDLK_BACKSLASH, SDLK_BACKSLASH, WKC_BACKSLASH, false},
+	{SDLK_RIGHTBRACKET, SDLK_RIGHTBRACKET, WKC_R_BRACKET, false},
+	{SDLK_APOSTROPHE, SDLK_APOSTROPHE, WKC_SINGLEQUOTE, false},
+	{SDLK_COMMA, SDLK_COMMA, WKC_COMMA, false},
+	{SDLK_MINUS, SDLK_MINUS, WKC_MINUS, false},
+	{SDLK_PERIOD, SDLK_PERIOD, WKC_PERIOD, false},
+};
+
+constexpr uint ConvertSDLKey(SDL_Keycode key, SDL_Scancode scancode, SDL_Keymod modifiers, char32_t *character = nullptr)
+{
+	uint mapped = 0;
+	bool unprintable = false;
+	for (const SDLKeyMapping &entry : _key_mapping) {
+		if (key >= entry.first && key <= entry.last) {
+			mapped = static_cast<uint>(entry.mapped) + key - entry.first;
+			unprintable = entry.unprintable;
+			break;
+		}
+	}
+
+	if (scancode == SDL_SCANCODE_GRAVE) mapped = WKC_BACKQUOTE;
+	if ((modifiers & SDL_KMOD_GUI) != 0) mapped |= WKC_META;
+	if ((modifiers & SDL_KMOD_SHIFT) != 0) mapped |= WKC_SHIFT;
+	if ((modifiers & SDL_KMOD_CTRL) != 0) mapped |= WKC_CTRL;
+	if ((modifiers & SDL_KMOD_ALT) != 0) mapped |= WKC_ALT;
+
+	if (character != nullptr) {
+		const bool modified = (modifiers & (SDL_KMOD_GUI | SDL_KMOD_CTRL | SDL_KMOD_ALT)) != 0;
+		*character = !modified && !unprintable && (key & (SDLK_EXTENDED_MASK | SDLK_SCANCODE_MASK)) == 0 ? key : 0;
+	}
+	return mapped;
+}
+
+constexpr bool HandleKeyWhileEditing(uint keycode, char32_t character)
+{
+	const uint base = keycode & ~WKC_SPECIAL_KEYS;
+	return base == WKC_DELETE || base == WKC_BACKSPACE || base == WKC_RETURN || base == WKC_NUM_ENTER ||
+			base == WKC_TAB || base == WKC_LEFT || base == WKC_RIGHT || base == WKC_UP || base == WKC_DOWN ||
+			base == WKC_HOME || base == WKC_END || (keycode & (WKC_META | WKC_CTRL | WKC_ALT)) != 0 ||
+			(base >= WKC_F1 && base <= WKC_F12) || !IsValidChar(character, CS_ALPHANUMERAL);
+}
+
+static_assert(ConvertSDLKey(SDLK_F12, SDL_SCANCODE_F12, SDL_KMOD_NONE) == WKC_F12);
+static_assert(ConvertSDLKey(SDLK_A, SDL_SCANCODE_A, SDL_KMOD_CTRL) == (WKC_CTRL | 'A'));
+static_assert(ConvertSDLKey(SDLK_GRAVE, SDL_SCANCODE_GRAVE, SDL_KMOD_NONE) == WKC_BACKQUOTE);
+
+} // namespace
+
 std::optional<std::string_view> VideoDriver_iOS::Start(const StringList &param)
 {
 	if (BlitterFactory::GetCurrentBlitter()->GetScreenDepth() != 32) return "The iOS video driver requires a 32bpp blitter";
 
 	SDL_SetHint(SDL_HINT_RENDER_DRIVER, "metal");
+	SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
+	SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "0");
+	SDL_SetHint(SDL_HINT_TRACKPAD_IS_TOUCH_ONLY, "0");
 	if (!SDL_InitSubSystem(SDL_INIT_VIDEO | SDL_INIT_EVENTS)) return SDL_GetError();
 
 	this->window = SDL_CreateWindow(VideoDriver::GetCaption().c_str(), 1024, 768,
@@ -45,6 +140,9 @@ std::optional<std::string_view> VideoDriver_iOS::Start(const StringList &param)
 	this->event_watch_installed = true;
 
 	if (!this->UpdateLayout(true)) return this->StartFailure(SDL_GetError());
+	SDL_StopTextInput(this->window);
+	this->edit_box_focused = false;
+	_cursor.in_window = true;
 
 	this->driver_info = fmt::format("{} ({})", this->GetName(), renderer_name);
 	this->is_game_threaded = !GetDriverParamBool(param, "no_threads") && !GetDriverParamBool(param, "no_thread");
@@ -59,6 +157,7 @@ std::optional<std::string_view> VideoDriver_iOS::Start(const StringList &param)
 	SDL_Log("IOS_VIDEO READY renderer=%s output=%dx%d window=%dx%d safe=%d,%d %dx%d threaded=%s",
 			renderer_name, output_width, output_height, this->window_width, this->window_height,
 			this->safe_x, this->safe_y, _screen.width, _screen.height, this->is_game_threaded ? "yes" : "no");
+	SDL_Log("IOS_INPUT READY touch=direct pointer=indirect keyboard=physical ime=native");
 	return std::nullopt;
 }
 
@@ -72,6 +171,14 @@ std::optional<std::string_view> VideoDriver_iOS::StartFailure(std::string error)
 void VideoDriver_iOS::Stop()
 {
 	this->SetGameThreadSuspended(false);
+	this->CancelTouchInput();
+	if (this->window != nullptr && this->edit_box_focused) SDL_StopTextInput(this->window);
+	this->edit_box_focused = false;
+	this->text_input_area_valid = false;
+	_left_button_down = false;
+	_left_button_clicked = false;
+	_right_button_down = false;
+	_right_button_clicked = false;
 	if (this->event_watch_installed) {
 		SDL_RemoveEventWatch(&VideoDriver_iOS::WatchLifecycle, this);
 		this->event_watch_installed = false;
@@ -134,6 +241,29 @@ bool VideoDriver_iOS::AfterBlitterChange()
 	return BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 32 && this->UpdateLayout(true);
 }
 
+void VideoDriver_iOS::EditBoxGainedFocus()
+{
+	if (this->window == nullptr || this->edit_box_focused) return;
+	this->UpdateTextInputArea();
+	if (!SDL_StartTextInput(this->window)) {
+		Debug(driver, 0, "iOS: could not start text input: {}", SDL_GetError());
+		return;
+	}
+	this->edit_box_focused = true;
+	SDL_Log("IOS_INPUT IME focus=on");
+}
+
+void VideoDriver_iOS::EditBoxLostFocus()
+{
+	if (this->window == nullptr || !this->edit_box_focused) return;
+	SDL_ClearComposition(this->window);
+	HandleTextInput({}, true);
+	if (!SDL_StopTextInput(this->window)) Debug(driver, 0, "iOS: could not stop text input: {}", SDL_GetError());
+	this->edit_box_focused = false;
+	this->text_input_area_valid = false;
+	SDL_Log("IOS_INPUT IME focus=off");
+}
+
 Dimension VideoDriver_iOS::GetScreenSize() const
 {
 	if (_screen.width > 0 && _screen.height > 0) return {static_cast<uint>(_screen.width), static_cast<uint>(_screen.height)};
@@ -160,6 +290,274 @@ void VideoDriver_iOS::CheckPaletteAnim()
 	this->MakeDirty(0, 0, _screen.width, _screen.height);
 }
 
+void VideoDriver_iOS::InputLoop()
+{
+	this->HandleGestureActions(this->touch_gesture.Update(SDL_GetTicksNS()));
+
+	const SDL_Keymod modifiers = SDL_GetModState();
+	const bool *keys = SDL_GetKeyboardState(nullptr);
+	const bool old_ctrl_pressed = _ctrl_pressed;
+	_ctrl_pressed = (modifiers & SDL_KMOD_CTRL) != 0;
+	_shift_pressed = (modifiers & SDL_KMOD_SHIFT) != 0;
+	this->fast_forward_key_pressed = keys[SDL_SCANCODE_TAB] && (modifiers & SDL_KMOD_ALT) == 0;
+	_dirkeys.Set(DirectionKey::Left, keys[SDL_SCANCODE_LEFT]);
+	_dirkeys.Set(DirectionKey::Up, keys[SDL_SCANCODE_UP]);
+	_dirkeys.Set(DirectionKey::Right, keys[SDL_SCANCODE_RIGHT]);
+	_dirkeys.Set(DirectionKey::Down, keys[SDL_SCANCODE_DOWN]);
+	if (old_ctrl_pressed != _ctrl_pressed) HandleCtrlChanged();
+
+	if (this->edit_box_focused) this->UpdateTextInputArea();
+}
+
+OpenTTDIOSInput::LogicalPoint VideoDriver_iOS::GetLogicalPoint(float x, float y) const
+{
+	return OpenTTDIOSInput::TranslateWindowPoint(x, y, this->safe_x, this->safe_y, _screen.width, _screen.height);
+}
+
+OpenTTDIOSInput::LogicalPoint VideoDriver_iOS::GetLogicalTouchPoint(float x, float y) const
+{
+	return this->GetLogicalPoint(x * this->window_width, y * this->window_height);
+}
+
+void VideoDriver_iOS::MoveCursor(const OpenTTDIOSInput::LogicalPoint &point, bool dispatch)
+{
+	_cursor.in_window = point.inside;
+	_cursor.UpdateCursorPosition(point.x, point.y);
+	if (dispatch) HandleMouseEvents();
+}
+
+void VideoDriver_iOS::HandleMouseMotion(const SDL_MouseMotionEvent &event)
+{
+	const OpenTTDIOSInput::LogicalPoint point = this->GetLogicalPoint(event.x, event.y);
+	_cursor.in_window = point.inside;
+	if (_cursor.fix_at) {
+		_cursor.UpdateCursorPositionRelative(static_cast<int>(std::lround(event.xrel)), static_cast<int>(std::lround(event.yrel)));
+	} else {
+		_cursor.UpdateCursorPosition(point.x, point.y);
+	}
+	HandleMouseEvents();
+}
+
+void VideoDriver_iOS::HandleMouseButton(const SDL_MouseButtonEvent &event)
+{
+	const OpenTTDIOSInput::LogicalPoint point = this->GetLogicalPoint(event.x, event.y);
+	if (!_cursor.fix_at) this->MoveCursor(point, false);
+	if (event.down && !point.inside) return;
+
+	switch (event.button) {
+		case SDL_BUTTON_LEFT:
+			_left_button_down = event.down;
+			if (!event.down) _left_button_clicked = false;
+			break;
+
+		case SDL_BUTTON_RIGHT:
+			_right_button_down = event.down;
+			if (event.down) _right_button_clicked = true;
+			break;
+
+		default:
+			return;
+	}
+	SDL_Log("IOS_INPUT POINTER button=%u down=%s", event.button, event.down ? "yes" : "no");
+	HandleMouseEvents();
+}
+
+void VideoDriver_iOS::HandleMouseWheel(const SDL_MouseWheelEvent &event)
+{
+	OpenTTDIOSInput::LogicalPoint point = this->GetLogicalPoint(event.mouse_x, event.mouse_y);
+	if (point.inside && !_cursor.fix_at) this->MoveCursor(point, false);
+
+	float x = event.x;
+	float y = event.y;
+	if (event.direction == SDL_MOUSEWHEEL_FLIPPED) {
+		x = -x;
+		y = -y;
+	}
+	if (y > 0) {
+		--_cursor.wheel;
+	} else if (y < 0) {
+		++_cursor.wheel;
+	}
+
+	constexpr float SCROLL_BUILTIN_MULTIPLIER = 14.0f;
+	_cursor.v_wheel -= y * SCROLL_BUILTIN_MULTIPLIER * _settings_client.gui.scrollwheel_multiplier;
+	_cursor.h_wheel += x * SCROLL_BUILTIN_MULTIPLIER * _settings_client.gui.scrollwheel_multiplier;
+	_cursor.wheel_moved = x != 0 || y != 0;
+	SDL_Log("IOS_INPUT POINTER wheel=%.3f,%.3f", x, y);
+}
+
+void VideoDriver_iOS::HandleKeyDown(const SDL_KeyboardEvent &event)
+{
+	char32_t character = 0;
+	const uint keycode = ConvertSDLKey(event.key, event.scancode, event.mod, &character);
+	if (!this->edit_box_focused || HandleKeyWhileEditing(keycode, character)) HandleKeypress(keycode, character);
+	SDL_Log("IOS_INPUT KEY scancode=%u keycode=%u repeat=%s", event.scancode, keycode, event.repeat ? "yes" : "no");
+}
+
+void VideoDriver_iOS::HandleTouch(const SDL_TouchFingerEvent &event)
+{
+	OpenTTDIOSInput::LogicalPoint point = this->GetLogicalTouchPoint(event.x, event.y);
+	OpenTTDIOSInput::GestureActions actions;
+
+	switch (event.type) {
+		case SDL_EVENT_FINGER_DOWN: {
+			if (!point.inside) return;
+			const size_t previous_count = this->touch_gesture.ActiveCount();
+			actions = this->touch_gesture.FingerDown(event.fingerID, point.x, point.y, event.timestamp);
+			if (previous_count == 1 && this->touch_gesture.ActiveCount() == 2) {
+				this->touch_pan_remainder_x = 0;
+				this->touch_pan_remainder_y = 0;
+				SDL_Log("IOS_INPUT TOUCH pan=begin");
+			}
+			break;
+		}
+
+		case SDL_EVENT_FINGER_MOTION:
+			actions = this->touch_gesture.FingerMotion(event.fingerID, point.x, point.y);
+			break;
+
+		case SDL_EVENT_FINGER_UP:
+		case SDL_EVENT_FINGER_CANCELED:
+			actions = this->touch_gesture.FingerUp(event.fingerID, point.x, point.y,
+					event.type == SDL_EVENT_FINGER_CANCELED);
+			break;
+
+		default:
+			return;
+	}
+
+	this->HandleGestureActions(actions);
+}
+
+void VideoDriver_iOS::HandleGestureActions(const OpenTTDIOSInput::GestureActions &actions)
+{
+	using OpenTTDIOSInput::GestureActionType;
+	for (size_t index = 0; index < actions.size; ++index) {
+		const OpenTTDIOSInput::GestureAction &action = actions.items[index];
+		const OpenTTDIOSInput::LogicalPoint point{
+			std::clamp(static_cast<int>(std::lround(action.x)), 0, _screen.width - 1),
+			std::clamp(static_cast<int>(std::lround(action.y)), 0, _screen.height - 1),
+			true,
+		};
+
+		switch (action.type) {
+			case GestureActionType::PointerMove:
+				this->MoveCursor(point);
+				break;
+
+			case GestureActionType::Tap:
+				this->MoveCursor(point, false);
+				_left_button_down = true;
+				HandleMouseEvents();
+				_left_button_down = false;
+				_left_button_clicked = false;
+				HandleMouseEvents();
+				SDL_Log("IOS_INPUT TOUCH tap=%d,%d", point.x, point.y);
+				break;
+
+			case GestureActionType::DragBegin:
+				this->MoveCursor(point, false);
+				_left_button_down = true;
+				HandleMouseEvents();
+				SDL_Log("IOS_INPUT TOUCH drag=begin x=%d y=%d", point.x, point.y);
+				break;
+
+			case GestureActionType::DragMove:
+			case GestureActionType::LongPressMove:
+				if (_cursor.fix_at) {
+					_cursor.UpdateCursorPositionRelative(static_cast<int>(std::lround(action.dx)), static_cast<int>(std::lround(action.dy)));
+					HandleMouseEvents();
+				} else {
+					this->MoveCursor(point);
+				}
+				break;
+
+			case GestureActionType::DragEnd:
+				if (!_cursor.fix_at) this->MoveCursor(point, false);
+				_left_button_down = false;
+				_left_button_clicked = false;
+				HandleMouseEvents();
+				SDL_Log("IOS_INPUT TOUCH drag=end x=%d y=%d", point.x, point.y);
+				break;
+
+			case GestureActionType::LongPressBegin:
+				this->MoveCursor(point, false);
+				_right_button_down = true;
+				_right_button_clicked = true;
+				HandleMouseEvents();
+				SDL_Log("IOS_INPUT TOUCH long_press=begin x=%d y=%d", point.x, point.y);
+				break;
+
+			case GestureActionType::LongPressEnd:
+				if (!_cursor.fix_at) this->MoveCursor(point, false);
+				_right_button_down = false;
+				HandleMouseEvents();
+				SDL_Log("IOS_INPUT TOUCH long_press=end x=%d y=%d", point.x, point.y);
+				break;
+
+			case GestureActionType::Pan: {
+				this->MoveCursor(point, false);
+				this->touch_pan_remainder_x -= action.dx;
+				this->touch_pan_remainder_y -= action.dy;
+				const int dx = static_cast<int>(this->touch_pan_remainder_x);
+				const int dy = static_cast<int>(this->touch_pan_remainder_y);
+				this->touch_pan_remainder_x -= dx;
+				this->touch_pan_remainder_y -= dy;
+				if (dx == 0 && dy == 0) break;
+
+				Window *window = FindWindowFromPt(point.x, point.y);
+				if (window != nullptr && IsPtInWindowViewport(window, point.x, point.y) != nullptr &&
+						_game_mode != GameMode::Menu && !HasModalProgress()) {
+					window->viewport->CancelFollow(*window);
+					window->OnScroll({dx, dy});
+				}
+				break;
+			}
+		}
+	}
+}
+
+void VideoDriver_iOS::UpdateTextInputArea()
+{
+	if (this->window == nullptr || !EditBoxInGlobalFocus() || _focused_window == nullptr) return;
+
+	const Point caret = _focused_window->GetCaretPosition();
+	SDL_Rect area{
+		this->safe_x + _focused_window->left + caret.x,
+		this->safe_y + _focused_window->top + caret.y,
+		1,
+		24,
+	};
+	if (_focused_window->nested_focus != nullptr && _focused_window->nested_focus->type == WWT_EDITBOX) {
+		const Rect widget = _focused_window->nested_focus->GetCurrentRect();
+		area = {
+			this->safe_x + _focused_window->left + widget.left,
+			this->safe_y + _focused_window->top + widget.top,
+			widget.Width(),
+			widget.Height(),
+		};
+	}
+	const int cursor = std::clamp(this->safe_x + _focused_window->left + caret.x - area.x, 0, area.w);
+	if (this->text_input_area_valid && area.x == this->text_input_area.x && area.y == this->text_input_area.y &&
+			area.w == this->text_input_area.w && area.h == this->text_input_area.h && cursor == this->text_input_cursor) return;
+
+	if (!SDL_SetTextInputArea(this->window, &area, cursor)) {
+		Debug(driver, 0, "iOS: could not set text input area: {}", SDL_GetError());
+		return;
+	}
+	this->text_input_area = area;
+	this->text_input_cursor = cursor;
+	this->text_input_area_valid = true;
+}
+
+void VideoDriver_iOS::CancelTouchInput()
+{
+	this->HandleGestureActions(this->touch_gesture.CancelAll());
+	this->pinch_gesture.Reset();
+	this->touch_pan_remainder_x = 0;
+	this->touch_pan_remainder_y = 0;
+}
+
 bool VideoDriver_iOS::PollEvent()
 {
 	SDL_Event event;
@@ -176,6 +574,7 @@ bool VideoDriver_iOS::PollEvent()
 		case SDL_EVENT_WINDOW_RESIZED:
 		case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
 		case SDL_EVENT_WINDOW_SAFE_AREA_CHANGED:
+			this->CancelTouchInput();
 			if (!this->UpdateLayout(false)) Debug(driver, 0, "iOS: failed to update window layout: {}", SDL_GetError());
 			this->redraw_requested = true;
 			break;
@@ -183,6 +582,94 @@ bool VideoDriver_iOS::PollEvent()
 		case SDL_EVENT_WINDOW_EXPOSED:
 		case SDL_EVENT_DID_ENTER_FOREGROUND:
 			this->redraw_requested = true;
+			break;
+
+		case SDL_EVENT_WILL_ENTER_BACKGROUND:
+		case SDL_EVENT_DID_ENTER_BACKGROUND:
+		case SDL_EVENT_WINDOW_FOCUS_LOST:
+			this->CancelTouchInput();
+			if (_left_button_down || _right_button_down) {
+				_left_button_down = false;
+				_left_button_clicked = false;
+				_right_button_down = false;
+				_right_button_clicked = false;
+				HandleMouseEvents();
+			}
+			break;
+
+		case SDL_EVENT_WINDOW_MOUSE_ENTER:
+			_cursor.in_window = true;
+			break;
+
+		case SDL_EVENT_WINDOW_MOUSE_LEAVE:
+			_cursor.in_window = false;
+			break;
+
+		case SDL_EVENT_MOUSE_MOTION:
+			if (event.motion.which != SDL_TOUCH_MOUSEID) this->HandleMouseMotion(event.motion);
+			break;
+
+		case SDL_EVENT_MOUSE_BUTTON_DOWN:
+		case SDL_EVENT_MOUSE_BUTTON_UP:
+			if (event.button.which != SDL_TOUCH_MOUSEID) this->HandleMouseButton(event.button);
+			break;
+
+		case SDL_EVENT_MOUSE_WHEEL:
+			this->HandleMouseWheel(event.wheel);
+			break;
+
+		case SDL_EVENT_FINGER_DOWN:
+		case SDL_EVENT_FINGER_MOTION:
+		case SDL_EVENT_FINGER_UP:
+		case SDL_EVENT_FINGER_CANCELED:
+			if (event.tfinger.touchID != SDL_MOUSE_TOUCHID) this->HandleTouch(event.tfinger);
+			break;
+
+		case SDL_EVENT_PINCH_BEGIN:
+			this->pinch_gesture.Reset();
+			SDL_Log("IOS_INPUT TOUCH pinch=begin");
+			break;
+
+		case SDL_EVENT_PINCH_UPDATE: {
+			const int steps = this->pinch_gesture.Update(event.pinch.scale);
+			if (steps != 0) {
+				_cursor.wheel += steps;
+				SDL_Log("IOS_INPUT TOUCH pinch_steps=%d", steps);
+			}
+			break;
+		}
+
+		case SDL_EVENT_PINCH_END:
+			this->pinch_gesture.Reset();
+			SDL_Log("IOS_INPUT TOUCH pinch=end");
+			break;
+
+		case SDL_EVENT_KEY_DOWN:
+			this->HandleKeyDown(event.key);
+			break;
+
+		case SDL_EVENT_TEXT_EDITING:
+			if (this->edit_box_focused) {
+				std::optional<size_t> caret;
+				if (event.edit.start >= 0) caret = OpenTTDIOSInput::Utf8ByteOffset(event.edit.text, event.edit.start);
+				HandleTextInput(event.edit.text, true, caret);
+				SDL_Log("IOS_INPUT IME composition_bytes=%zu caret=%d", strlen(event.edit.text), event.edit.start);
+			}
+			break;
+
+		case SDL_EVENT_TEXT_INPUT:
+			if (this->edit_box_focused) {
+				const SDL_Keycode key = SDL_GetKeyFromName(event.text.text);
+				const uint keycode = ConvertSDLKey(key, SDL_SCANCODE_UNKNOWN, SDL_KMOD_NONE);
+				if (keycode == WKC_BACKQUOTE && FocusedWindowIsConsole()) {
+					auto [length, character] = DecodeUtf8(event.text.text);
+					if (length > 0) HandleKeypress(keycode, character);
+				} else {
+					HandleTextInput({}, true);
+					HandleTextInput(event.text.text);
+				}
+				SDL_Log("IOS_INPUT IME commit_bytes=%zu", strlen(event.text.text));
+			}
 			break;
 
 		default:
