@@ -162,8 +162,11 @@ if(NOT OPTION_DEDICATED)
     find_package(OpusFile)
     find_package(Soxr)
 endif()
-if(APPLE AND NOT IOS)
+if(APPLE)
     enable_language(OBJCXX)
+endif()
+
+if(APPLE AND NOT IOS)
 
     find_package(Iconv)
 

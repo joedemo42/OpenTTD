@@ -10,11 +10,17 @@
 #ifndef OPENTTD_IOS_H
 #define OPENTTD_IOS_H
 
+#include <stdbool.h>
+#include <stddef.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 const char *OpenTTDIOSGetEngineRevision(void);
+const char *OpenTTDIOSGetDocumentsPath(void);
+bool OpenTTDIOSPrepareDocuments(char *error_message, size_t error_message_size);
+bool OpenTTDIOSValidateDocuments(char *error_message, size_t error_message_size);
 
 #ifdef __cplusplus
 }

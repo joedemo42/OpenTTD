@@ -661,17 +661,19 @@ bool ExtractTar(const std::string &tar_filename, Subdirectory subdir)
 	return true;
 }
 
-#if defined(_WIN32)
+#if defined(_WIN32) || (defined(__APPLE__) && TARGET_OS_IPHONE)
 /**
  * Determine the base (personal dir and game data dir) paths
  * @param exe the path from the current path to the executable
- * @note defined in the OS related files (win32.cpp, unix.cpp etc)
+ * @note defined in the OS related files (win32.cpp, ios_fileio.mm etc)
  */
 extern void DetermineBasePaths(std::string_view exe);
 
+#if defined(_WIN32)
 /** Mimics the getcwd from POSIX for Windows. */
 char *getcwd(char *buf, size_t size);
-#else /* defined(_WIN32) */
+#endif
+#else /* defined(_WIN32) || (defined(__APPLE__) && TARGET_OS_IPHONE) */
 
 /**
  * Changes the working directory to the path of the give executable.
@@ -919,7 +921,7 @@ extern std::string CocoaGetAppSupportDir();
 		}
 	}
 }
-#endif /* defined(_WIN32) */
+#endif /* defined(_WIN32) || (defined(__APPLE__) && TARGET_OS_IPHONE) */
 
 std::string _personal_dir;
 
