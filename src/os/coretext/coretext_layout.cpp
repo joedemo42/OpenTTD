@@ -5,24 +5,28 @@
  * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
  */
 
-/** @file string_osx.cpp Functions related to localized text support on OSX. */
+/** @file coretext_layout.cpp CoreText layout and localized string support shared by Apple platforms. */
 
 #include "../../stdafx.h"
-#include "string_osx.h"
+
+#include <CoreFoundation/CoreFoundation.h>
+#include <CoreGraphics/CoreGraphics.h>
+#include <CoreText/CoreText.h>
+
+#include "coretext_layout.h"
 #include "../../string_func.h"
 #include "../../strings_func.h"
 #include "../../core/utf8.hpp"
 #include "../../table/control_codes.h"
 #include "../../fontcache.h"
 #include "../../zoom_func.h"
-#include "macos.h"
+#include "coretext_type.h"
 
-#include <CoreFoundation/CoreFoundation.h>
 #include "../../safeguards.h"
 
 
 /** Cached current locale. */
-static CFAutoRelease<CFLocaleRef> _osx_locale;
+static CFAutoRelease<CFLocaleRef> _coretext_locale;
 /** CoreText cache for font information, cleared when OTTD changes fonts. */
 static EnumIndexArray<CFAutoRelease<CTFontRef>, FontSize, FontSize::End> _font_cache;
 
@@ -273,7 +277,7 @@ int CoreTextParagraphLayout::CoreTextLine::GetWidth() const
  * Delete CoreText font reference for a specific font size.
  * @param size The font size to delete.
  */
-void MacOSResetScriptCache(FontSize size)
+void CoreTextResetScriptCache(FontSize size)
 {
 	_font_cache[size].reset();
 }
@@ -282,7 +286,7 @@ void MacOSResetScriptCache(FontSize size)
  * Register an external font file with the CoreText system.
  * @param file_path UTF-8 encoded path of the font.
  */
-void MacOSRegisterExternalFont(std::string_view file_path)
+void CoreTextRegisterExternalFont(std::string_view file_path)
 {
 	CFAutoRelease<CFStringRef> path(CFStringCreateWithBytes(kCFAllocatorDefault, reinterpret_cast<const UInt8 *>(file_path.data()), file_path.size(), kCFStringEncodingUTF8, false));
 	CFAutoRelease<CFURLRef> url(CFURLCreateWithFileSystemPath(kCFAllocatorDefault, path.get(), kCFURLPOSIXPathStyle, false));
@@ -294,10 +298,10 @@ void MacOSRegisterExternalFont(std::string_view file_path)
  * Store current language locale as a CoreFoundation locale.
  * @param iso_code The ISO language code to set.
  */
-void MacOSSetCurrentLocaleName(std::string_view iso_code)
+void CoreTextSetCurrentLocaleName(std::string_view iso_code)
 {
 	CFAutoRelease<CFStringRef> iso(CFStringCreateWithBytes(kCFAllocatorDefault, reinterpret_cast<const UInt8 *>(iso_code.data()), iso_code.size(), kCFStringEncodingUTF8, false));
-	_osx_locale.reset(CFLocaleCreate(kCFAllocatorDefault, iso.get()));
+	_coretext_locale.reset(CFLocaleCreate(kCFAllocatorDefault, iso.get()));
 }
 
 /**
@@ -307,7 +311,7 @@ void MacOSSetCurrentLocaleName(std::string_view iso_code)
  * @param s2 Second string to compare.
  * @return 1 if s1 < s2, 2 if s1 == s2, 3 if s1 > s2, or 0 if not supported by the OS.
  */
-int MacOSStringCompare(std::string_view s1, std::string_view s2)
+int CoreTextStringCompare(std::string_view s1, std::string_view s2)
 {
 	CFStringCompareFlags flags = kCFCompareCaseInsensitive | kCFCompareNumerically | kCFCompareLocalized | kCFCompareWidthInsensitive | kCFCompareForcedOrdering;
 
@@ -317,7 +321,7 @@ int MacOSStringCompare(std::string_view s1, std::string_view s2)
 	/* If any CFString could not be created (e.g., due to UTF8 invalid chars), return OS unsupported functionality */
 	if (cf1 == nullptr || cf2 == nullptr) return 0;
 
-	return (int)CFStringCompareWithOptionsAndLocale(cf1.get(), cf2.get(), CFRangeMake(0, CFStringGetLength(cf1.get())), flags, _osx_locale.get()) + 2;
+	return (int)CFStringCompareWithOptionsAndLocale(cf1.get(), cf2.get(), CFRangeMake(0, CFStringGetLength(cf1.get())), flags, _coretext_locale.get()) + 2;
 }
 
 /**
@@ -328,7 +332,7 @@ int MacOSStringCompare(std::string_view s1, std::string_view s2)
  * @param case_insensitive Search case-insensitive.
  * @return 1 if value was found, 0 if it was not found, or -1 if not supported by the OS.
  */
-int MacOSStringContains(std::string_view str, std::string_view value, bool case_insensitive)
+int CoreTextStringContains(std::string_view str, std::string_view value, bool case_insensitive)
 {
 	CFStringCompareFlags flags = kCFCompareLocalized | kCFCompareWidthInsensitive;
 	if (case_insensitive) flags |= kCFCompareCaseInsensitive;
@@ -339,11 +343,11 @@ int MacOSStringContains(std::string_view str, std::string_view value, bool case_
 	/* If any CFString could not be created (e.g., due to UTF8 invalid chars), return OS unsupported functionality */
 	if (cf_str == nullptr || cf_value == nullptr) return -1;
 
-	return CFStringFindWithOptionsAndLocale(cf_str.get(), cf_value.get(), CFRangeMake(0, CFStringGetLength(cf_str.get())), flags, _osx_locale.get(), nullptr) ? 1 : 0;
+	return CFStringFindWithOptionsAndLocale(cf_str.get(), cf_value.get(), CFRangeMake(0, CFStringGetLength(cf_str.get())), flags, _coretext_locale.get(), nullptr) ? 1 : 0;
 }
 
 
-/* virtual */ void OSXStringIterator::SetString(std::string_view s)
+/* virtual */ void CoreTextStringIterator::SetString(std::string_view s)
 {
 	this->utf16_to_utf8.clear();
 	this->str_info.clear();
@@ -383,7 +387,7 @@ int MacOSStringContains(std::string_view str, std::string_view value, bool case_
 		}
 
 		/* Get word breaks. */
-		CFAutoRelease<CFStringTokenizerRef> tokenizer(CFStringTokenizerCreate(kCFAllocatorDefault, str.get(), CFRangeMake(0, CFStringGetLength(str.get())), kCFStringTokenizerUnitWordBoundary, _osx_locale.get()));
+		CFAutoRelease<CFStringTokenizerRef> tokenizer(CFStringTokenizerCreate(kCFAllocatorDefault, str.get(), CFRangeMake(0, CFStringGetLength(str.get())), kCFStringTokenizerUnitWordBoundary, _coretext_locale.get()));
 
 		CFStringTokenizerTokenType tokenType = kCFStringTokenizerTokenNone;
 		while ((tokenType = CFStringTokenizerAdvanceToNextToken(tokenizer.get())) != kCFStringTokenizerTokenNone) {
@@ -400,7 +404,7 @@ int MacOSStringContains(std::string_view str, std::string_view value, bool case_
 	this->str_info.back().word_stop = true;
 }
 
-/* virtual */ size_t OSXStringIterator::SetCurPosition(size_t pos)
+/* virtual */ size_t CoreTextStringIterator::SetCurPosition(size_t pos)
 {
 	/* Convert incoming position to an UTF-16 string index. */
 	size_t utf16_pos = 0;
@@ -418,7 +422,7 @@ int MacOSStringContains(std::string_view str, std::string_view value, bool case_
 	return this->utf16_to_utf8[this->cur_pos];
 }
 
-/* virtual */ size_t OSXStringIterator::Next(IterType what)
+/* virtual */ size_t CoreTextStringIterator::Next(IterType what)
 {
 	assert(this->cur_pos <= this->utf16_to_utf8.size());
 	assert(what == StringIterator::ITER_CHARACTER || what == StringIterator::ITER_WORD);
@@ -432,7 +436,7 @@ int MacOSStringContains(std::string_view str, std::string_view value, bool case_
 	return this->cur_pos == this->utf16_to_utf8.size() ? END : this->utf16_to_utf8[this->cur_pos];
 }
 
-/* virtual */ size_t OSXStringIterator::Prev(IterType what)
+/* virtual */ size_t CoreTextStringIterator::Prev(IterType what)
 {
 	assert(this->cur_pos <= this->utf16_to_utf8.size());
 	assert(what == StringIterator::ITER_CHARACTER || what == StringIterator::ITER_WORD);
@@ -446,7 +450,7 @@ int MacOSStringContains(std::string_view str, std::string_view value, bool case_
 	return this->utf16_to_utf8[this->cur_pos];
 }
 
-/* static */ std::unique_ptr<StringIterator> OSXStringIterator::Create()
+/* static */ std::unique_ptr<StringIterator> CoreTextStringIterator::Create()
 {
-	return std::make_unique<OSXStringIterator>();
+	return std::make_unique<CoreTextStringIterator>();
 }

@@ -1,3 +1,4 @@
+add_subdirectory(coretext)
 add_subdirectory(ios)
 add_subdirectory(macosx)
 add_subdirectory(unix)

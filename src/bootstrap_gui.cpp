@@ -13,7 +13,7 @@
 #include "blitter/factory.hpp"
 #include "error_func.h"
 
-#if defined(WITH_FREETYPE) || defined(WITH_UNISCRIBE) || defined(WITH_COCOA)
+#if defined(WITH_FREETYPE) || defined(WITH_UNISCRIBE) || defined(WITH_CORETEXT)
 
 #include "core/geometry_func.hpp"
 #include "error.h"
@@ -369,7 +369,7 @@ bool HandleBootstrap()
 	if (BlitterFactory::GetCurrentBlitter()->GetScreenDepth() == 0) goto failure;
 
 	/* If there is no network or no non-sprite font, then there is nothing we can do. Go straight to failure. */
-#if defined(__EMSCRIPTEN__) || (defined(_WIN32) && defined(WITH_UNISCRIBE)) || (defined(WITH_FREETYPE) && (defined(WITH_FONTCONFIG) || defined(__APPLE__))) || defined(WITH_COCOA)
+#if defined(__EMSCRIPTEN__) || (defined(_WIN32) && defined(WITH_UNISCRIBE)) || (defined(WITH_FREETYPE) && (defined(WITH_FONTCONFIG) || defined(__APPLE__))) || defined(WITH_CORETEXT)
 	if (!_network_available) goto failure;
 
 	/* First tell the game we're bootstrapping. */

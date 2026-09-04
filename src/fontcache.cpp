@@ -172,7 +172,7 @@ uint GetFontCacheFontSize(FontSize fs)
 	return IsDefaultFont(setting) ? FontCache::GetDefaultFontHeight(fs) : setting.size;
 }
 
-#if defined(WITH_FREETYPE) || defined(_WIN32) || defined(WITH_COCOA)
+#if defined(WITH_FREETYPE) || defined(_WIN32) || defined(WITH_CORETEXT)
 /**
  * Get name of default font file for a given font size.
  * @param fs Font size.
@@ -188,7 +188,7 @@ static std::string GetDefaultTruetypeFont(FontSize fs)
 		default: NOT_REACHED();
 	}
 }
-#endif /* defined(WITH_FREETYPE) || defined(_WIN32) || defined(WITH_COCOA) */
+#endif /* defined(WITH_FREETYPE) || defined(_WIN32) || defined(WITH_CORETEXT) */
 
 /**
  * Get path of default font file for a given font size.
@@ -197,12 +197,12 @@ static std::string GetDefaultTruetypeFont(FontSize fs)
  */
 static std::string GetDefaultTruetypeFontFile([[maybe_unused]] FontSize fs)
 {
-#if defined(WITH_FREETYPE) || defined(_WIN32) || defined(WITH_COCOA)
+#if defined(WITH_FREETYPE) || defined(_WIN32) || defined(WITH_CORETEXT)
 	/* Find font file. */
 	return FioFindFullPath(Subdirectory::Baseset, GetDefaultTruetypeFont(fs));
 #else
 	return {};
-#endif /* defined(WITH_FREETYPE) || defined(_WIN32) || defined(WITH_COCOA) */
+#endif /* defined(WITH_FREETYPE) || defined(_WIN32) || defined(WITH_CORETEXT) */
 }
 
 /**

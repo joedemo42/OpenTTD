@@ -2109,9 +2109,9 @@ bool ReadLanguagePack(const LanguageMetadata *lang)
 	Win32SetCurrentLocaleName(_current_language->isocode);
 #endif
 
-#ifdef WITH_COCOA
-	extern void MacOSSetCurrentLocaleName(std::string_view iso_code);
-	MacOSSetCurrentLocaleName(_current_language->isocode);
+#ifdef WITH_CORETEXT
+	extern void CoreTextSetCurrentLocaleName(std::string_view iso_code);
+	CoreTextSetCurrentLocaleName(_current_language->isocode);
 #endif
 
 #ifdef WITH_ICU_I18N
@@ -2390,7 +2390,7 @@ void CheckForMissingGlyphs(MissingGlyphSearcher *searcher)
 	searcher->DetermineRequiredGlyphs(searcher->fontsizes);
 	bool bad_font = searcher->missing_fontsizes.Any();
 
-#if defined(WITH_FREETYPE) || defined(_WIN32) || defined(WITH_COCOA)
+#if defined(WITH_FREETYPE) || defined(_WIN32) || defined(WITH_CORETEXT)
 	if (bad_font) {
 		/* We found an unprintable character... lets try whether we can find
 		 * a fallback font that can print the characters in the current language. */
@@ -2433,7 +2433,7 @@ void CheckForMissingGlyphs(MissingGlyphSearcher *searcher)
 		return;
 	}
 
-#if !(defined(WITH_ICU_I18N) && defined(WITH_HARFBUZZ)) && !defined(WITH_UNISCRIBE) && !defined(WITH_COCOA)
+#if !(defined(WITH_ICU_I18N) && defined(WITH_HARFBUZZ)) && !defined(WITH_UNISCRIBE) && !defined(WITH_CORETEXT)
 	/*
 	 * For right-to-left languages we need the ICU library. If
 	 * we do not have support for that library we warn the user
@@ -2450,5 +2450,5 @@ void CheckForMissingGlyphs(MissingGlyphSearcher *searcher)
 		builder.Put("This version of OpenTTD does not support right-to-left languages. Recompile with ICU + Harfbuzz enabled.");
 		ShowErrorMessage(GetEncodedString(STR_JUST_RAW_STRING, std::move(err_str)), {}, WarningLevel::Error);
 	}
-#endif /* !(WITH_ICU_I18N && WITH_HARFBUZZ) && !WITH_UNISCRIBE && !WITH_COCOA */
+#endif /* !(WITH_ICU_I18N && WITH_HARFBUZZ) && !WITH_UNISCRIBE && !WITH_CORETEXT */
 }

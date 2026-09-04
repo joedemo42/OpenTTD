@@ -35,8 +35,8 @@
 #	include "gfx_func.h"
 #endif /* WITH_ICU_I18N */
 
-#if defined(WITH_COCOA)
-#	include "os/macosx/string_osx.h"
+#if defined(WITH_CORETEXT)
+#	include "os/coretext/coretext_layout.h"
 #endif
 
 #include "safeguards.h"
@@ -446,8 +446,8 @@ int StrNaturalCompare(std::string_view s1, std::string_view s2, bool ignore_garb
 	if (res != 0) return res - 2; // Convert to normal C return values.
 #endif
 
-#if defined(WITH_COCOA) && !defined(STRGEN) && !defined(SETTINGSGEN)
-	int res = MacOSStringCompare(s1, s2);
+#if defined(WITH_CORETEXT) && !defined(STRGEN) && !defined(SETTINGSGEN)
+	int res = CoreTextStringCompare(s1, s2);
 	if (res != 0) return res - 2; // Convert to normal C return values.
 #endif
 
@@ -507,8 +507,8 @@ static int ICUStringContains(std::string_view str, std::string_view value, bool 
 	if (res >= 0) return res > 0;
 #endif
 
-#if defined(WITH_COCOA) && !defined(STRGEN) && !defined(SETTINGSGEN)
-	int res = MacOSStringContains(str, value, false);
+#if defined(WITH_CORETEXT) && !defined(STRGEN) && !defined(SETTINGSGEN)
+	int res = CoreTextStringContains(str, value, false);
 	if (res >= 0) return res > 0;
 #endif
 
@@ -534,8 +534,8 @@ static int ICUStringContains(std::string_view str, std::string_view value, bool 
 	if (res >= 0) return res > 0;
 #endif
 
-#if defined(WITH_COCOA) && !defined(STRGEN) && !defined(SETTINGSGEN)
-	int res = MacOSStringContains(str, value, true);
+#if defined(WITH_CORETEXT) && !defined(STRGEN) && !defined(SETTINGSGEN)
+	int res = CoreTextStringContains(str, value, true);
 	if (res >= 0) return res > 0;
 #endif
 
@@ -831,10 +831,10 @@ public:
 	}
 };
 
-#if defined(WITH_COCOA) && !defined(STRGEN) && !defined(SETTINGSGEN)
+#if defined(WITH_CORETEXT) && !defined(STRGEN) && !defined(SETTINGSGEN)
 /* static */ std::unique_ptr<StringIterator> StringIterator::Create()
 {
-	std::unique_ptr<StringIterator> i = OSXStringIterator::Create();
+	std::unique_ptr<StringIterator> i = CoreTextStringIterator::Create();
 	if (i != nullptr) return i;
 
 	return std::make_unique<DefaultStringIterator>();
@@ -844,7 +844,7 @@ public:
 {
 	return std::make_unique<DefaultStringIterator>();
 }
-#endif /* defined(WITH_COCOA) && !defined(STRGEN) && !defined(SETTINGSGEN) */
+#endif /* defined(WITH_CORETEXT) && !defined(STRGEN) && !defined(SETTINGSGEN) */
 
 #endif
 

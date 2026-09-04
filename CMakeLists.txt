@@ -164,6 +164,18 @@ if(NOT OPTION_DEDICATED)
 endif()
 if(APPLE)
     enable_language(OBJCXX)
+
+    find_library(COREGRAPHICS_LIBRARY CoreGraphics)
+    find_library(CORETEXT_LIBRARY CoreText)
+    if(NOT COREGRAPHICS_LIBRARY)
+        message(FATAL_ERROR "CoreGraphics is required for this platform")
+    endif()
+    if(NOT CORETEXT_LIBRARY)
+        message(FATAL_ERROR "CoreText is required for this platform")
+    endif()
+
+    set(WITH_CORETEXT TRUE)
+    add_definitions(-DWITH_CORETEXT)
 endif()
 
 if(APPLE AND NOT IOS)
@@ -303,6 +315,13 @@ target_link_libraries(openttd_lib
     openttd::script_api
     Threads::Threads
 )
+
+if(APPLE)
+    target_link_libraries(openttd_lib
+        ${COREGRAPHICS_LIBRARY}
+        ${CORETEXT_LIBRARY}
+    )
+endif()
 
 if(NOT IOS)
     target_link_libraries(openttd

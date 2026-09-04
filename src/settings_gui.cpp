@@ -65,7 +65,7 @@
 #include "safeguards.h"
 
 
-#if defined(WITH_FREETYPE) || defined(_WIN32) || defined(WITH_COCOA)
+#if defined(WITH_FREETYPE) || defined(_WIN32) || defined(WITH_CORETEXT)
 #	define HAS_TRUETYPE_FONT
 #endif
 

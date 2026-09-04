@@ -5,11 +5,11 @@
  * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
  */
 
-/** @file font_osx.cpp Functions related to font handling on MacOS. */
+/** @file coretext_font.cpp CoreText font handling shared by Apple platforms. */
 
 #include "../../stdafx.h"
 #include "../../debug.h"
-#include "font_osx.h"
+#include "coretext_font.h"
 #include "../../core/math_func.hpp"
 #include "../../blitter/factory.hpp"
 #include "../../error_func.h"
@@ -17,7 +17,6 @@
 #include "../../string_func.h"
 #include "../../strings_func.h"
 #include "../../zoom_func.h"
-#include "macos.h"
 
 #include "../../table/control_codes.h"
 

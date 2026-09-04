@@ -27,8 +27,8 @@
 #include "os/windows/string_uniscribe.h"
 #endif /* WITH_UNISCRIBE */
 
-#ifdef WITH_COCOA
-#include "os/macosx/string_osx.h"
+#ifdef WITH_CORETEXT
+#include "os/coretext/coretext_layout.h"
 #endif
 
 #include "safeguards.h"
@@ -160,7 +160,7 @@ Layouter::Layouter(std::string_view str, int maxw, FontSize fontsize) : string(s
 			}
 #endif
 
-#ifdef WITH_COCOA
+#ifdef WITH_CORETEXT
 			if (line.layout == nullptr) {
 				GetLayouter<CoreTextParagraphLayoutFactory>(line, str_line, state);
 				if (line.layout == nullptr) {
@@ -379,8 +379,8 @@ void Layouter::ResetFontCache(FontSize size)
 #if defined(WITH_UNISCRIBE)
 	UniscribeResetScriptCache(size);
 #endif
-#if defined(WITH_COCOA)
-	MacOSResetScriptCache(size);
+#if defined(WITH_CORETEXT)
+	CoreTextResetScriptCache(size);
 #endif
 }
 

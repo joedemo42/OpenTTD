@@ -5,16 +5,16 @@
  * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
  */
 
-/** @file string_osx.h Functions related to localized text support on OSX. */
+/** @file coretext_layout.h CoreText layout and localized string support shared by Apple platforms. */
 
-#ifndef STRING_OSX_H
-#define STRING_OSX_H
+#ifndef CORETEXT_LAYOUT_H
+#define CORETEXT_LAYOUT_H
 
 #include "../../gfx_layout.h"
 #include "../../string_base.h"
 
 /** String iterator using CoreText as a backend. */
-class OSXStringIterator : public StringIterator {
+class CoreTextStringIterator : public StringIterator {
 	/** Break info for a character. */
 	struct CharInfo {
 		bool word_stop : 1; ///< Code point is suitable as a word break.
@@ -41,7 +41,7 @@ public:
 class CoreTextParagraphLayoutFactory {
 public:
 	/** Helper for GetLayouter, to get the right type. */
-	typedef UniChar CharType;
+	typedef uint16_t CharType;
 	/** Helper for GetLayouter, to get whether the layouter supports RTL. */
 	static const bool SUPPORTS_RTL = true;
 
@@ -81,11 +81,11 @@ public:
 	}
 };
 
-void MacOSResetScriptCache(FontSize size);
-void MacOSSetCurrentLocaleName(std::string_view iso_code);
-int MacOSStringCompare(std::string_view s1, std::string_view s2);
-int MacOSStringContains(std::string_view str, std::string_view value, bool case_insensitive);
+void CoreTextResetScriptCache(FontSize size);
+void CoreTextSetCurrentLocaleName(std::string_view iso_code);
+int CoreTextStringCompare(std::string_view s1, std::string_view s2);
+int CoreTextStringContains(std::string_view str, std::string_view value, bool case_insensitive);
 
-void MacOSRegisterExternalFont(std::string_view file_path);
+void CoreTextRegisterExternalFont(std::string_view file_path);
 
-#endif /* STRING_OSX_H */
+#endif /* CORETEXT_LAYOUT_H */

@@ -5,15 +5,16 @@
  * See the GNU General Public License for more details. You should have received a copy of the GNU General Public License along with OpenTTD. If not, see <https://www.gnu.org/licenses/old-licenses/gpl-2.0>.
  */
 
-/** @file font_osx.h Functions related to font handling on MacOS. */
+/** @file coretext_font.h CoreText font handling shared by Apple platforms. */
 
-#ifndef FONT_OSX_H
-#define FONT_OSX_H
+#ifndef CORETEXT_FONT_H
+#define CORETEXT_FONT_H
+
+#include "coretext_type.h"
+
+#include <CoreText/CoreText.h>
 
 #include "../../fontcache/truetypefontcache.h"
-#include "macos.h"
-
-#include <CoreFoundation/CoreFoundation.h>
 
 class CoreTextFontCache : public TrueTypeFontCache {
 	CFAutoRelease<CTFontDescriptorRef> font_desc; ///< Font descriptor excluding font size.
@@ -33,6 +34,4 @@ public:
 	const void *GetOSHandle() override { return font.get(); }
 };
 
-void LoadCoreTextFont(FontSize fs);
-
-#endif /* FONT_OSX_H */
+#endif /* CORETEXT_FONT_H */
