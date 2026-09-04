@@ -6,6 +6,7 @@ add_test_files(
     history_func.cpp
     ios_audio.cpp
     ios_input.cpp
+    ios_music.cpp
     landscape_partial_pixel_z.cpp
     math_func.cpp
     mock_environment.h
