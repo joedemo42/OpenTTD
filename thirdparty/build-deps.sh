@@ -12,7 +12,7 @@ PROBE_ROOT="$SCRIPT_DIR/probes"
 IOS_MIN_VERSION="${IOS_MIN_VERSION:-26.0}"
 
 readonly SDKS=(iphoneos iphonesimulator)
-readonly DEPENDENCIES=(sdl3 zlib xz libpng lzo)
+readonly DEPENDENCIES=(sdl3 zlib xz libpng lzo timgm6mb)
 
 SDL3_VERSION="3.4.10"
 SDL3_ARCHIVE="SDL3-${SDL3_VERSION}.tar.gz"
@@ -38,6 +38,12 @@ LZO_VERSION="2.10"
 LZO_ARCHIVE="lzo-${LZO_VERSION}.tar.gz"
 LZO_URL="https://www.oberhumer.com/opensource/lzo/download/${LZO_ARCHIVE}"
 LZO_SHA256="c0f892943208266f9b6543b3ae308fab6284c5c90e627931446fb49b4221a072"
+
+TIMGM6MB_VERSION="1.3"
+TIMGM6MB_ARCHIVE="timgm6mb-soundfont_${TIMGM6MB_VERSION}.orig.tar.gz"
+TIMGM6MB_URL="https://deb.debian.org/debian/pool/main/t/timgm6mb-soundfont/${TIMGM6MB_ARCHIVE}"
+TIMGM6MB_SHA256="af8f3a00e416dfb262bcaa904a1c84df04a51b72bbc1313aed012bc754bdf99b"
+TIMGM6MB_SF2_SHA256="c5378b62028c920cb11e4803327983fee2f2cdff5dc89c708e39da417e51c854"
 
 usage()
 {
@@ -470,6 +476,44 @@ probe_lzo()
 	done
 }
 
+build_timgm6mb()
+{
+	download_archive "$TIMGM6MB_ARCHIVE" "$TIMGM6MB_URL" "$TIMGM6MB_SHA256"
+	prepare_source timgm6mb "$TIMGM6MB_ARCHIVE" "$TIMGM6MB_SHA256" "timgm6mb-soundfont_$TIMGM6MB_VERSION"
+
+	local dependency_root="$BUILD_ROOT/timgm6mb"
+	local output="$ARTIFACT_ROOT/TimGM6mb"
+	local license_notice="$SCRIPT_DIR/licenses/TimGM6mb.txt"
+	local fingerprint="$TIMGM6MB_SHA256:$TIMGM6MB_SF2_SHA256:$(sha256_file "$license_notice"):$(sha256_file "$REPO_ROOT/source/COPYING.md")"
+	local stamp="$output/artifact.stamp"
+	if [[ -f "$stamp" && "$(<"$stamp")" == "$fingerprint" ]]; then
+		verify_timgm6mb
+		echo "Using staged TimGM6mb SoundFont"
+		return
+	fi
+
+	local staging="$dependency_root/TimGM6mb.staging"
+	rm -rf "$staging"
+	mkdir -p "$staging"
+	cp "$dependency_root/src/TimGM6mb.sf2" "$staging/"
+	cp "$license_notice" "$staging/LICENSE.txt"
+	cp "$REPO_ROOT/source/COPYING.md" "$staging/COPYING.md"
+	printf '%s\n' "$fingerprint" > "$staging/artifact.stamp"
+	rm -rf "$output"
+	mv "$staging" "$output"
+	verify_timgm6mb
+	echo "Created $output"
+}
+
+verify_timgm6mb()
+{
+	local output="$ARTIFACT_ROOT/TimGM6mb"
+	[[ -f "$output/TimGM6mb.sf2" ]] || fail "TimGM6mb SoundFont was not staged"
+	[[ "$(sha256_file "$output/TimGM6mb.sf2")" == "$TIMGM6MB_SF2_SHA256" ]] || fail "TimGM6mb SoundFont SHA-256 mismatch"
+	[[ -s "$output/LICENSE.txt" ]] || fail "TimGM6mb copyright notice was not staged"
+	[[ -s "$output/COPYING.md" ]] || fail "TimGM6mb GPL-2 license was not staged"
+}
+
 build_dependency()
 {
 	case "$1" in
@@ -478,6 +522,7 @@ build_dependency()
 		xz) build_xz ;;
 		libpng) build_libpng ;;
 		lzo) build_lzo ;;
+		timgm6mb) build_timgm6mb ;;
 		*) fail "no builder for dependency: $1" ;;
 	esac
 }
@@ -490,6 +535,7 @@ verify_dependency()
 		xz) probe_xz ;;
 		libpng) probe_libpng ;;
 		lzo) probe_lzo ;;
+		timgm6mb) verify_timgm6mb ;;
 		*) fail "no verifier for dependency: $1" ;;
 	esac
 }
@@ -540,6 +586,7 @@ case "$command" in
 			xz) rm -rf "$ARTIFACT_ROOT/LibLZMA.xcframework" ;;
 			libpng) rm -rf "$ARTIFACT_ROOT/LibPNG.xcframework" ;;
 			lzo) rm -rf "$ARTIFACT_ROOT/LZO.xcframework" ;;
+			timgm6mb) rm -rf "$ARTIFACT_ROOT/TimGM6mb" ;;
 		esac
 		;;
 	list)
@@ -549,6 +596,7 @@ case "$command" in
 		echo "xz $XZ_VERSION"
 		echo "libpng $LIBPNG_VERSION"
 		echo "lzo $LZO_VERSION"
+		echo "timgm6mb $TIMGM6MB_VERSION"
 		;;
 	*)
 		usage
