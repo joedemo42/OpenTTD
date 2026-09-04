@@ -23,7 +23,9 @@ if (EMSCRIPTEN)
 endif()
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
-set(CMAKE_OSX_DEPLOYMENT_TARGET 10.15)
+if(NOT IOS)
+    set(CMAKE_OSX_DEPLOYMENT_TARGET 10.15)
+endif()
 
 # Use GNUInstallDirs to allow customisation
 # but set our own default data and bin dir
@@ -58,7 +60,7 @@ if(APPLE OR UNIX)
     add_definitions(-DUNIX)
 endif()
 
-if(UNIX)
+if(UNIX AND NOT IOS)
     find_package(Doxygen)
 endif()
 
@@ -74,6 +76,7 @@ add_custom_target(find_version
                 -DCPACK_BINARY_DIR=${CMAKE_BINARY_DIR}
                 -DREV_MAJOR=${PROJECT_VERSION_MAJOR}
                 -DREV_MINOR=${PROJECT_VERSION_MINOR}
+                -DUSE_PARENT_GIT=${OPTION_USE_PARENT_GIT}
                 -DWINDOWS=${WIN32}
                 -DDOXYGEN_WARN_FORMAT_LINE=${DOXYGEN_WARN_FORMAT_LINE}
                 -DDOXYGEN_WARN_FILE=${DOXYGEN_WARN_FILE}
@@ -126,9 +129,10 @@ find_package(LibLZMA)
 find_package(LZO)
 find_package(PNG)
 
-if(WIN32 OR EMSCRIPTEN)
+if(WIN32 OR EMSCRIPTEN OR IOS)
     # Windows uses WinHttp for HTTP requests.
     # Emscripten uses Javascript for HTTP requests.
+    # iOS uses a native HTTP backend.
 else()
     # All other targets use libcurl.
     find_package(CURL)
@@ -158,7 +162,7 @@ if(NOT OPTION_DEDICATED)
     find_package(OpusFile)
     find_package(Soxr)
 endif()
-if(APPLE)
+if(APPLE AND NOT IOS)
     enable_language(OBJCXX)
 
     find_package(Iconv)
@@ -169,7 +173,7 @@ if(APPLE)
     find_library(QUARTZCORE_LIBRARY QuartzCore)
 endif()
 
-if(NOT EMSCRIPTEN AND NOT OPTION_DEDICATED)
+if(NOT EMSCRIPTEN AND NOT IOS AND NOT OPTION_DEDICATED)
     find_package(OpenGL COMPONENTS OpenGL)
 endif()
 
@@ -197,7 +201,7 @@ if(UNIX AND NOT APPLE AND NOT OPTION_DEDICATED)
         message(WARNING "Without HarfBuzz and ICU i18n the game will not be able to render right-to-left languages correctly")
     endif()
 endif()
-if(APPLE)
+if(APPLE AND NOT IOS)
     if(NOT AUDIOTOOLBOX_LIBRARY)
         message(FATAL_ERROR "AudioToolbox is required for this platform")
     endif()
@@ -241,10 +245,15 @@ include_directories(${CMAKE_SOURCE_DIR}/src/3rdparty/squirrel/include)
 
 include(MSVCFilters)
 
-add_library(openttd_lib OBJECT ${GENERATED_SOURCE_FILES})
-add_executable(openttd WIN32)
-add_executable(openttd_test)
-set_target_properties(openttd PROPERTIES OUTPUT_NAME "${BINARY_NAME}")
+if(IOS)
+    add_library(openttd_lib STATIC ${GENERATED_SOURCE_FILES})
+    set_target_properties(openttd_lib PROPERTIES OUTPUT_NAME openttd_engine)
+else()
+    add_library(openttd_lib OBJECT ${GENERATED_SOURCE_FILES})
+    add_executable(openttd WIN32)
+    add_executable(openttd_test)
+    set_target_properties(openttd PROPERTIES OUTPUT_NAME "${BINARY_NAME}")
+endif()
 # All other files are added via target_sources()
 
 if(MSVC)
@@ -267,12 +276,19 @@ target_precompile_headers(openttd_lib
 )
 set_source_files_properties(src/3rdparty/fmt/format.cc PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 
-add_subdirectory(${CMAKE_SOURCE_DIR}/bin)
+if(NOT IOS)
+    add_subdirectory(${CMAKE_SOURCE_DIR}/bin)
+endif()
 add_subdirectory(${CMAKE_SOURCE_DIR}/src)
-add_subdirectory(${CMAKE_SOURCE_DIR}/media)
+if(NOT IOS)
+    add_subdirectory(${CMAKE_SOURCE_DIR}/media)
+endif()
 
-add_dependencies(openttd
-    find_version)
+if(IOS)
+    add_dependencies(openttd_lib find_version)
+else()
+    add_dependencies(openttd find_version)
+endif()
 
 target_link_libraries(openttd_lib
     openttd::languages
@@ -281,30 +297,34 @@ target_link_libraries(openttd_lib
     Threads::Threads
 )
 
-target_link_libraries(openttd
-    openttd_lib
-    openttd::media
-    openttd::basesets
-)
+if(NOT IOS)
+    target_link_libraries(openttd
+        openttd_lib
+        openttd::media
+        openttd::basesets
+    )
 
-target_link_libraries(openttd_test PRIVATE openttd_lib)
-if(ANDROID)
-    target_link_libraries(openttd_test PRIVATE log)
+    target_link_libraries(openttd_test PRIVATE openttd_lib)
+    if(ANDROID)
+        target_link_libraries(openttd_test PRIVATE log)
+    endif()
+
+    include(Catch)
+    catch_discover_tests(openttd_test)
 endif()
-
-include(Catch)
-catch_discover_tests(openttd_test)
 
 if(HAIKU)
     target_link_libraries(openttd_lib "be" "network" "midi")
 endif()
 
-if(IPO_FOUND)
+if(IPO_FOUND AND NOT IOS)
     set_target_properties(openttd PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELEASE True)
     set_target_properties(openttd PROPERTIES INTERPROCEDURAL_OPTIMIZATION_MINSIZEREL True)
     set_target_properties(openttd PROPERTIES INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO True)
 endif()
-set_target_properties(openttd PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_BINARY_DIR}")
+if(NOT IOS)
+    set_target_properties(openttd PROPERTIES VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_BINARY_DIR}")
+endif()
 
 include(LinkPackage)
 link_package(PNG TARGET PNG::PNG ENCOURAGED)
@@ -312,7 +332,7 @@ link_package(ZLIB TARGET ZLIB::ZLIB ENCOURAGED)
 link_package(LIBLZMA TARGET LibLZMA::LibLZMA ENCOURAGED)
 link_package(LZO)
 
-if(NOT WIN32 AND NOT EMSCRIPTEN)
+if(NOT WIN32 AND NOT EMSCRIPTEN AND NOT IOS)
     link_package(CURL ENCOURAGED)
     target_link_libraries(openttd_lib ${CMAKE_DL_LIBS})
 endif()
@@ -346,7 +366,7 @@ endif()
 
 include(3rdparty/llvm/CheckAtomic)
 
-if(APPLE)
+if(APPLE AND NOT IOS)
     link_package(Iconv TARGET Iconv::Iconv)
 
     target_link_libraries(openttd_lib
@@ -462,12 +482,13 @@ if(CMAKE_SIZEOF_VOID_P EQUAL 8)
     add_definitions(-DPOINTER_IS_64BIT)
 endif()
 
-enable_testing()
+if(NOT IOS)
+    enable_testing()
+    add_subdirectory(regression)
 
-add_subdirectory(regression)
+    if(APPLE OR WIN32)
+        find_package(Pandoc)
+    endif()
 
-if(APPLE OR WIN32)
-    find_package(Pandoc)
+    include(InstallAndPackage)
 endif()
-
-include(InstallAndPackage)

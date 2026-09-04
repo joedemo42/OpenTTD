@@ -60,6 +60,7 @@ function(set_options)
     option(OPTION_USE_NSIS "Use NSIS to create windows installer; enable only for stable releases" OFF)
     option(OPTION_TOOLS_ONLY "Build only tools target" OFF)
     option(OPTION_DOCS_ONLY "Build only docs target" OFF)
+    option(OPTION_USE_PARENT_GIT "Use Git metadata when the source is nested in a parent worktree" OFF)
     option(OPTION_ALLOW_INVALID_SIGNATURE "Allow loading of content with invalid signatures" OFF)
     option(OPTION_LINE_IN_DOXYGEN_WARNINGS "Print line number in doxygen warnings" ON)
 

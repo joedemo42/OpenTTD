@@ -4,11 +4,11 @@ add_files(
     cocoa_v.mm
     cocoa_wnd.h
     cocoa_wnd.mm
-    CONDITION APPLE
+    CONDITION APPLE AND NOT IOS
 )
 
 add_files(
     cocoa_ogl.h
     cocoa_ogl.mm
-    CONDITION APPLE AND OPENGL_FOUND
+    CONDITION APPLE AND NOT IOS AND OPENGL_FOUND
 )

@@ -14,7 +14,7 @@ if(NOT OPTION_DEDICATED)
     add_files(
         cocoa_m.cpp
         cocoa_m.h
-        CONDITION APPLE
+        CONDITION APPLE AND NOT IOS
     )
 
     add_files(
@@ -28,7 +28,7 @@ if(NOT OPTION_DEDICATED)
     add_files(
         extmidi.cpp
         extmidi.h
-        CONDITION UNIX
+        CONDITION UNIX AND NOT IOS
     )
 
     add_files(
