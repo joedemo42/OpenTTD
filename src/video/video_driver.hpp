@@ -191,6 +191,12 @@ public:
 	void GameLoopPause();
 
 	/**
+	 * Suspend or resume the game thread without changing OpenTTD's pause state.
+	 * Platform video drivers use this while their application cannot run.
+	 */
+	void SetGameThreadSuspended(bool suspended);
+
+	/**
 	 * Prevents the system from going to sleep.
 	 *
 	 * @param inhibited If true, sleep will be disabled. If false, sleep will be enabled.
@@ -365,6 +371,9 @@ protected:
 	std::thread game_thread;
 	std::mutex game_state_mutex;
 	std::mutex game_thread_wait_mutex;
+	std::mutex game_thread_suspend_mutex;
+	std::condition_variable game_thread_suspend_cv;
+	bool game_thread_suspended = false;
 
 	bool uses_hardware_acceleration;
 

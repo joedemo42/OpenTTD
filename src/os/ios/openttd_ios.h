@@ -21,6 +21,7 @@ const char *OpenTTDIOSGetEngineRevision(void);
 const char *OpenTTDIOSGetDocumentsPath(void);
 bool OpenTTDIOSPrepareDocuments(char *error_message, size_t error_message_size);
 bool OpenTTDIOSValidateDocuments(char *error_message, size_t error_message_size);
+int OpenTTDIOSMain(int argc, char *argv[]);
 
 #ifdef __cplusplus
 }

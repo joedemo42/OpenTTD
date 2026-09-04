@@ -28,6 +28,12 @@ if(NOT OPTION_DEDICATED)
     )
 
     add_files(
+        ios_v.cpp
+        ios_v.h
+        CONDITION IOS
+    )
+
+    add_files(
         win32_v.cpp
         win32_v.h
         CONDITION WIN32

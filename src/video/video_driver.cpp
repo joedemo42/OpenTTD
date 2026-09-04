@@ -45,6 +45,14 @@ void VideoDriver::GameLoop()
 void VideoDriver::GameThread()
 {
 	while (!_exit_game) {
+		{
+			std::unique_lock<std::mutex> lock(this->game_thread_suspend_mutex);
+			this->game_thread_suspend_cv.wait(lock, [this]() {
+				return !this->game_thread_suspended || _exit_game;
+			});
+		}
+		if (_exit_game) break;
+
 		this->GameLoop();
 
 		auto now = std::chrono::steady_clock::now();
@@ -59,6 +67,15 @@ void VideoDriver::GameThread()
 			std::lock_guard<std::mutex> lock(this->game_thread_wait_mutex);
 		}
 	}
+}
+
+void VideoDriver::SetGameThreadSuspended(bool suspended)
+{
+	{
+		std::lock_guard<std::mutex> lock(this->game_thread_suspend_mutex);
+		this->game_thread_suspended = suspended;
+	}
+	if (!suspended) this->game_thread_suspend_cv.notify_all();
 }
 
 /**
@@ -98,6 +115,7 @@ void VideoDriver::StopGameThread()
 {
 	if (!this->is_game_threaded) return;
 
+	this->SetGameThreadSuspended(false);
 	this->game_thread.join();
 }
 
