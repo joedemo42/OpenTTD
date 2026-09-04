@@ -1,0 +1,93 @@
+name: OpenTTD
+options:
+  createIntermediateGroups: true
+  deploymentTarget:
+    iOS: "26.0"
+  xcodeVersion: "26.0"
+settings:
+  base:
+    ARCHS: arm64
+    GCC_C_LANGUAGE_STANDARD: gnu17
+    CODE_SIGN_STYLE: Automatic
+    CURRENT_PROJECT_VERSION: 1
+    DEAD_CODE_STRIPPING: YES
+    DEVELOPMENT_TEAM: XXXXXXXXXX
+    ENABLE_BITCODE: NO
+    IPHONEOS_DEPLOYMENT_TARGET: "26.0"
+    MARKETING_VERSION: "0.1"
+    ONLY_ACTIVE_ARCH: YES
+    PRODUCT_BUNDLE_IDENTIFIER: com.example.openttd
+    SUPPORTS_MACCATALYST: NO
+    SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
+    SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
+    TARGETED_DEVICE_FAMILY: "1,2"
+targets:
+  OpenTTD:
+    type: application
+    platform: iOS
+    deploymentTarget: "26.0"
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: OpenTTD
+        CFBundleShortVersionString: "$(MARKETING_VERSION)"
+        CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        LSApplicationCategoryType: public.app-category.simulation-games
+        LSSupportsOpeningDocumentsInPlace: true
+        NSLocalNetworkUsageDescription: OpenTTD uses your local network to discover and join multiplayer games.
+        UIApplicationSupportsIndirectInputEvents: true
+        UIFileSharingEnabled: true
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UIRequiredDeviceCapabilities:
+          - arm64
+        UIStatusBarHidden: true
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIViewControllerBasedStatusBarAppearance: false
+    sources:
+      - path: App/main.m
+    resources:
+      - path: Assets.xcassets
+    settings:
+      base:
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        OTHER_LDFLAGS:
+          - "$(inherited)"
+          - -ObjC
+          - -lm
+          - -lpthread
+    dependencies:
+      - framework: ../thirdparty/artifacts/SDL3.xcframework
+        embed: false
+      - framework: ../thirdparty/artifacts/Zlib.xcframework
+        embed: false
+      - framework: ../thirdparty/artifacts/LibLZMA.xcframework
+        embed: false
+      - framework: ../thirdparty/artifacts/LibPNG.xcframework
+        embed: false
+      - framework: ../thirdparty/artifacts/LZO.xcframework
+        embed: false
+      - sdk: AudioToolbox.framework
+      - sdk: AVFoundation.framework
+      - sdk: CoreAudio.framework
+      - sdk: CoreGraphics.framework
+      - sdk: CoreMedia.framework
+      - sdk: CoreVideo.framework
+      - sdk: Foundation.framework
+      - sdk: GameController.framework
+      - sdk: Metal.framework
+      - sdk: QuartzCore.framework
+      - sdk: UIKit.framework
+schemes:
+  OpenTTD:
+    build:
+      targets:
+        OpenTTD: all
+    run:
+      config: Debug
+    archive:
+      config: Release
