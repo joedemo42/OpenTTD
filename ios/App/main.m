@@ -1,5 +1,6 @@
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
+#include <openttd_ios.h>
 
 #include <string.h>
 
@@ -97,6 +98,7 @@ int main(int argc, char *argv[])
 	const char *documents = SDL_GetUserFolder(SDL_FOLDER_DOCUMENTS);
 	SDL_Log("IOS_PROBE READY renderer=%s output=%dx%d documents=%s", renderer_name,
 		output_width, output_height, documents == NULL ? "(unavailable)" : documents);
+	SDL_Log("IOS_PROBE ENGINE revision=%s", OpenTTDIOSGetEngineRevision());
 
 	bool running = true;
 	while (running) {

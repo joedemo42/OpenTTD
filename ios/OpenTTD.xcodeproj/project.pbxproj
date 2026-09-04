@@ -19,6 +19,7 @@
 		63211843CFC37F8A29539000 /* LibLZMA.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = B31C015729C741BAB143EE42 /* LibLZMA.xcframework */; };
 		6981AB42D5ED91D3295B05EF /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0948C0C1E819FCB36C18829A /* AudioToolbox.framework */; };
 		7E02A1D7F1B7F251CF3C9746 /* SDL3.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = B78AB34339A4F930DB694AD1 /* SDL3.xcframework */; };
+		89FE9071AE267E110381F1C4 /* OpenTTDEngine.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 97123F94A793BC9D25F43D2B /* OpenTTDEngine.xcframework */; };
 		BB4D44073C01152554AD6AB0 /* LZO.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 54D764641F164989CC68E487 /* LZO.xcframework */; };
 		BF55B228D27712C8BD237B21 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4F2137D0EB8CE86376E5B32F /* AVFoundation.framework */; };
 		DE3C7F260581561DF058AF0C /* CoreAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CFAB0ECF8D6F694D2CFBE1E2 /* CoreAudio.framework */; };
@@ -37,6 +38,7 @@
 		6C1E95F92E6374B4B07A0518 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
 		6EC6113A62B052F0DDAE811B /* OpenTTD.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = OpenTTD.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		7F944515AEEDF2B228EB6394 /* Zlib.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = Zlib.xcframework; path = ../thirdparty/artifacts/Zlib.xcframework; sourceTree = "<group>"; };
+		97123F94A793BC9D25F43D2B /* OpenTTDEngine.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = OpenTTDEngine.xcframework; path = "../DerivedData/OpenTTD-engine/OpenTTDEngine.xcframework"; sourceTree = "<group>"; };
 		B31C015729C741BAB143EE42 /* LibLZMA.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = LibLZMA.xcframework; path = ../thirdparty/artifacts/LibLZMA.xcframework; sourceTree = "<group>"; };
 		B78AB34339A4F930DB694AD1 /* SDL3.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = SDL3.xcframework; path = ../thirdparty/artifacts/SDL3.xcframework; sourceTree = "<group>"; };
 		CFAB0ECF8D6F694D2CFBE1E2 /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
@@ -52,6 +54,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				89FE9071AE267E110381F1C4 /* OpenTTDEngine.xcframework in Frameworks */,
 				7E02A1D7F1B7F251CF3C9746 /* SDL3.xcframework in Frameworks */,
 				3813F0881D0665BC98B45898 /* Zlib.xcframework in Frameworks */,
 				63211843CFC37F8A29539000 /* LibLZMA.xcframework in Frameworks */,
@@ -114,6 +117,7 @@
 				E5603AE63DF34F6FED69F3F2 /* LibPNG.xcframework */,
 				54D764641F164989CC68E487 /* LZO.xcframework */,
 				6C1E95F92E6374B4B07A0518 /* Metal.framework */,
+				97123F94A793BC9D25F43D2B /* OpenTTDEngine.xcframework */,
 				F467F5B2CCA75C74DCCDF4A3 /* QuartzCore.framework */,
 				B78AB34339A4F930DB694AD1 /* SDL3.xcframework */,
 				DC2DF0381F53F3860267029C /* UIKit.framework */,
@@ -265,6 +269,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
+					"\"../DerivedData/OpenTTD-engine\"",
 					"\"../thirdparty/artifacts\"",
 				);
 				INFOPLIST_FILE = App/Info.plist;
@@ -276,6 +281,7 @@
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
+					"-lc++",
 					"-lm",
 					"-lpthread",
 				);
@@ -366,6 +372,7 @@
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				FRAMEWORK_SEARCH_PATHS = (
 					"$(inherited)",
+					"\"../DerivedData/OpenTTD-engine\"",
 					"\"../thirdparty/artifacts\"",
 				);
 				INFOPLIST_FILE = App/Info.plist;
@@ -377,6 +384,7 @@
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
+					"-lc++",
 					"-lm",
 					"-lpthread",
 				);

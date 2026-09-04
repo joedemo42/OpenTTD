@@ -12,6 +12,10 @@ DEFAULT_SIMULATOR="iPad Air 11-inch (M4)"
 DEFAULT_DEVICE="OldPad"
 LOG_DIR="$REPO_ROOT/log"
 DATA_STAGE="$DERIVED_DATA/DataPackage"
+SOURCE_DIR="$REPO_ROOT/source"
+ENGINE_ROOT="$DERIVED_DATA/OpenTTD-engine"
+ENGINE_XCFRAMEWORK="$ENGINE_ROOT/OpenTTDEngine.xcframework"
+IOS_MIN_VERSION="26.0"
 
 usage()
 {
@@ -19,6 +23,8 @@ usage()
 Usage: $(basename "$0") <command> [arguments]
 
 Commands:
+  engine <simulator|device|all>    Build native generators and iOS engine archive(s).
+  test-host                        Build and run the upstream host tests.
   generate                         Generate OpenTTD.xcodeproj with XcodeGen.
   build <simulator|device> [name]  Incrementally build for arm64.
   install <simulator|device> [name-or-UUID]
@@ -55,10 +61,145 @@ require_artifacts()
 	done
 }
 
+require_engine_artifact()
+{
+	[[ -d "$ENGINE_XCFRAMEWORK" ]] || \
+		fail "missing OpenTTDEngine.xcframework; run ios/build.sh engine all"
+}
+
+build_host_tools()
+{
+	require_tool cmake
+	require_tool ninja
+	local build_directory="$ENGINE_ROOT/host"
+	local signature="Ninja|Release|tools|$(command -v c++)"
+	local stamp="$build_directory/ios-config.stamp"
+	if [[ ! -f "$build_directory/build.ninja" || ! -f "$stamp" || "$(<"$stamp")" != "$signature" ]]; then
+		cmake -E remove_directory "$build_directory"
+		cmake -S "$SOURCE_DIR" -B "$build_directory" -G Ninja \
+			-DCMAKE_BUILD_TYPE=Release \
+			-DOPTION_TOOLS_ONLY=ON
+		printf '%s\n' "$signature" > "$stamp"
+	fi
+	cmake --build "$build_directory" --target tools --parallel
+}
+
+build_engine_slice()
+{
+	local sdk="$1"
+	local artifact_slice
+	case "$sdk" in
+		iphoneos) artifact_slice="ios-arm64" ;;
+		iphonesimulator) artifact_slice="ios-arm64-simulator" ;;
+		*) fail "unknown engine SDK: $sdk" ;;
+	esac
+
+	local sdk_path compiler dependency_root build_directory
+	sdk_path="$(xcrun --sdk "$sdk" --show-sdk-path)"
+	compiler="$(xcrun --find clang++)"
+	dependency_root="$REPO_ROOT/thirdparty/artifacts"
+	build_directory="$ENGINE_ROOT/$sdk"
+
+	local signature="Ninja|Release|$sdk_path|arm64|$IOS_MIN_VERSION|$compiler|$artifact_slice|parent-git"
+	local stamp="$build_directory/ios-config.stamp"
+	if [[ ! -f "$build_directory/build.ninja" || ! -f "$stamp" || "$(<"$stamp")" != "$signature" ]]; then
+		cmake -E remove_directory "$build_directory"
+		cmake -S "$SOURCE_DIR" -B "$build_directory" -G Ninja \
+			-DCMAKE_SYSTEM_NAME=iOS \
+			-DCMAKE_OSX_SYSROOT="$sdk_path" \
+			-DCMAKE_OSX_ARCHITECTURES=arm64 \
+			-DCMAKE_OSX_DEPLOYMENT_TARGET="$IOS_MIN_VERSION" \
+			-DCMAKE_CXX_COMPILER="$compiler" \
+			-DCMAKE_BUILD_TYPE=Release \
+			-DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+			-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
+			-DHOST_BINARY_DIR="$ENGINE_ROOT/host" \
+			-DOPTION_USE_PARENT_GIT=ON \
+			-DZLIB_INCLUDE_DIR="$dependency_root/Zlib.xcframework/$artifact_slice/Headers" \
+			-DZLIB_LIBRARY="$dependency_root/Zlib.xcframework/$artifact_slice/libz.a" \
+			-DLIBLZMA_INCLUDE_DIR="$dependency_root/LibLZMA.xcframework/$artifact_slice/Headers" \
+			-DLIBLZMA_LIBRARY="$dependency_root/LibLZMA.xcframework/$artifact_slice/liblzma.a" \
+			-DPNG_PNG_INCLUDE_DIR="$dependency_root/LibPNG.xcframework/$artifact_slice/Headers" \
+			-DPNG_LIBRARY="$dependency_root/LibPNG.xcframework/$artifact_slice/libpng16.a" \
+			-DLZO_INCLUDE_DIR="$dependency_root/LZO.xcframework/$artifact_slice/Headers" \
+			-DLZO_LIBRARY="$dependency_root/LZO.xcframework/$artifact_slice/liblzo2.a"
+		printf '%s\n' "$signature" > "$stamp"
+	fi
+	cmake --build "$build_directory" --target openttd_lib --parallel
+
+	local archive="$build_directory/libopenttd_engine.a"
+	[[ -f "$archive" ]] || fail "$sdk engine archive was not produced"
+	lipo -info "$archive" | grep -q 'arm64' || fail "$sdk engine archive is not arm64"
+}
+
+package_engine()
+{
+	local device_archive="$ENGINE_ROOT/iphoneos/libopenttd_engine.a"
+	local simulator_archive="$ENGINE_ROOT/iphonesimulator/libopenttd_engine.a"
+	[[ -f "$device_archive" && -f "$simulator_archive" ]] || return
+
+	if [[ -f "$ENGINE_XCFRAMEWORK/Info.plist" && \
+		"$ENGINE_XCFRAMEWORK/Info.plist" -nt "$device_archive" && \
+		"$ENGINE_XCFRAMEWORK/Info.plist" -nt "$simulator_archive" ]]; then
+		echo "Using packaged OpenTTD engine"
+		return
+	fi
+
+	local staging="$ENGINE_ROOT/OpenTTDEngine.staging.xcframework"
+	rm -rf "$staging"
+	xcodebuild -create-xcframework \
+		-library "$device_archive" \
+		-headers "$SOURCE_DIR/src/os/ios" \
+		-library "$simulator_archive" \
+		-headers "$SOURCE_DIR/src/os/ios" \
+		-output "$staging"
+	rm -rf "$ENGINE_XCFRAMEWORK"
+	mv "$staging" "$ENGINE_XCFRAMEWORK"
+	plutil -lint "$ENGINE_XCFRAMEWORK/Info.plist" >/dev/null
+	echo "Created $ENGINE_XCFRAMEWORK"
+}
+
+build_engine()
+{
+	local selection="$1"
+	require_artifacts
+	require_tool cmake
+	require_tool lipo
+	require_tool ninja
+	require_tool plutil
+	build_host_tools
+	case "$selection" in
+		simulator) build_engine_slice iphonesimulator ;;
+		device) build_engine_slice iphoneos ;;
+		all)
+			build_engine_slice iphoneos
+			build_engine_slice iphonesimulator
+			;;
+		*) fail "engine platform must be simulator, device, or all" ;;
+	esac
+	package_engine
+}
+
+test_host()
+{
+	require_tool cmake
+	require_tool ctest
+	require_tool ninja
+	require_tool unzip
+	local build_directory="$ENGINE_ROOT/host-tests"
+	cmake -S "$SOURCE_DIR" -B "$build_directory" -G Ninja \
+		-DCMAKE_BUILD_TYPE=Debug \
+		-DOPTION_USE_PARENT_GIT=ON
+	cmake --build "$build_directory" --target openttd_test openttd regression_files --parallel
+	unzip -oqj "$REPO_ROOT/Data/opengfx-8.0-all.zip" '*.tar' -d "$build_directory/baseset"
+	ctest --test-dir "$build_directory" --output-on-failure
+}
+
 generate_project()
 {
 	require_tool xcodegen
 	require_artifacts
+	require_engine_artifact
 	mkdir -p "$DERIVED_DATA"
 	xcodegen --spec "$IOS_DIR/project.yml" --project "$IOS_DIR" \
 		--cache-path "$DERIVED_DATA/xcodegen-cache" --use-cache
@@ -122,6 +263,7 @@ build_app()
 	local platform="$1"
 	local selector="${2:-}"
 	local signing="${3:-signed}"
+	build_engine all
 	generate_project
 	local arguments=(
 		-project "$PROJECT"
@@ -281,6 +423,8 @@ test_simulator()
 	if (( width < height )); then
 		sips --rotate -90 "$LOG_DIR/skeleton.png" >/dev/null
 	fi
+	grep -Fq 'IOS_PROBE ENGINE revision=' "$LOG_DIR/simulator.log" || \
+		fail "OpenTTD engine marker missing from simulator log"
 	grep -Fq 'IOS_PROBE READY renderer=metal' "$LOG_DIR/simulator.log" || \
 		fail "Metal readiness marker missing from simulator log"
 	echo "Simulator probe passed; logs and screenshot are in $LOG_DIR"
@@ -299,6 +443,8 @@ test_device()
 	sleep "$seconds"
 	kill -INT "$console_pid" 2>/dev/null || true
 	wait "$console_pid" || true
+	grep -Fq 'IOS_PROBE ENGINE revision=' "$LOG_DIR/device-debugger.log" || \
+		fail "OpenTTD engine marker missing from device console"
 	grep -Fq 'IOS_PROBE READY renderer=metal' "$LOG_DIR/device-debugger.log" || \
 		fail "Metal readiness marker missing from device console"
 	echo "Device probe passed for $seconds seconds; console output is in $LOG_DIR/device-debugger.log"
@@ -306,6 +452,7 @@ test_device()
 
 archive_app()
 {
+	build_engine all
 	generate_project
 	xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration Release \
 		-destination 'generic/platform=iOS' -derivedDataPath "$DERIVED_DATA" \
@@ -338,8 +485,17 @@ mkdir -p "$DERIVED_DATA"
 
 command="${1:-}"
 case "$command" in
+	engine)
+		[[ $# -eq 2 ]] || { usage; exit 2; }
+		build_engine "$2"
+		;;
+	test-host)
+		[[ $# -eq 1 ]] || { usage; exit 2; }
+		test_host
+		;;
 	generate)
 		[[ $# -eq 1 ]] || { usage; exit 2; }
+		build_engine all
 		generate_project
 		;;
 	build|install|run)
