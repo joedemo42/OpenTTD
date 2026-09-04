@@ -499,6 +499,7 @@ test_simulator()
 	install_app simulator "$simulator"
 	mkdir -p "$LOG_DIR"
 	xcrun simctl launch --terminate-running-process --console "$simulator" "$BUNDLE_ID" \
+		-s ios -S OpenSFX -d driver=1,misc=1 \
 		> "$LOG_DIR/debugger.log" 2>&1 &
 	local console_pid=$!
 	sleep "$seconds"
@@ -525,6 +526,12 @@ test_simulator()
 		fail "Metal readiness marker missing from simulator log"
 	grep -Fq 'IOS_VIDEO PRESENT first_dirty=' "$LOG_DIR/simulator.log" || \
 		fail "OpenTTD framebuffer presentation marker missing from simulator log"
+	grep -Fq 'IOS_AUDIO READY rate=' "$LOG_DIR/simulator.log" || \
+		fail "SDL3 audio readiness marker missing from simulator log"
+	grep -F 'IOS_AUDIO READY rate=' "$LOG_DIR/simulator.log" | grep -Fq 'sound_set=OpenSFX' || \
+		fail "OpenSFX selection marker missing from simulator log"
+	grep -Fq 'IOS_AUDIO CALLBACK active=yes' "$LOG_DIR/simulator.log" || \
+		fail "SDL3 audio callback marker missing from simulator log"
 	local container
 	container="$(xcrun simctl get_app_container "$simulator" "$BUNDLE_ID" data)"
 	[[ ! -e "$container/Documents/OpenTTD" ]] || fail "simulator contains the forbidden Documents/OpenTTD wrapper"
@@ -543,7 +550,8 @@ test_device()
 	mkdir -p "$LOG_DIR"
 	local console_timeout=$((seconds + 60))
 	xcrun devicectl device process launch --terminate-existing --console --timeout "$console_timeout" \
-		--device "$selector" "$BUNDLE_ID" > "$LOG_DIR/device-debugger.log" 2>&1 &
+		--device "$selector" "$BUNDLE_ID" -s ios -S OpenSFX -d driver=1,misc=1 \
+		> "$LOG_DIR/device-debugger.log" 2>&1 &
 	local console_pid=$!
 	local launch_wait=0
 	while ! grep -Fq 'IOS_ENGINE START revision=' "$LOG_DIR/device-debugger.log"; do
@@ -582,6 +590,12 @@ test_device()
 		fail "Metal readiness marker missing from device console"
 	grep -Fq 'IOS_VIDEO PRESENT first_dirty=' "$LOG_DIR/device-debugger.log" || \
 		fail "OpenTTD framebuffer presentation marker missing from device console"
+	grep -Fq 'IOS_AUDIO READY rate=' "$LOG_DIR/device-debugger.log" || \
+		fail "SDL3 audio readiness marker missing from device console"
+	grep -F 'IOS_AUDIO READY rate=' "$LOG_DIR/device-debugger.log" | grep -Fq 'sound_set=OpenSFX' || \
+		fail "OpenSFX selection marker missing from device console"
+	grep -Fq 'IOS_AUDIO CALLBACK active=yes' "$LOG_DIR/device-debugger.log" || \
+		fail "SDL3 audio callback marker missing from device console"
 	echo "Device engine test passed for $seconds seconds after startup; console output is in $LOG_DIR/device-debugger.log"
 }
 
