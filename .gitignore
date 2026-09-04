@@ -1,0 +1,29 @@
+# Local project instructions and working documents
+AGENTS.md
+CONTINUE.md
+LESSONS.md
+PLAN.md
+STATE.md
+TASKS.md
+ios/FIXES.md
+ios/PORTING.md
+thirdparty/PATCHES.md
+
+# Downloaded data and dependency working trees
+Data/
+thirdparty/artifacts/
+thirdparty/build/
+thirdparty/source/
+
+# Logs and generated build output
+log/
+DerivedData/
+build/
+CMakeCache.txt
+CMakeFiles/
+*.dSYM/
+*.ipa
+*.xcarchive/
+*.xcuserstate
+xcuserdata/
+.DS_Store
