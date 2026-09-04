@@ -12,12 +12,17 @@ PROBE_ROOT="$SCRIPT_DIR/probes"
 IOS_MIN_VERSION="${IOS_MIN_VERSION:-26.0}"
 
 readonly SDKS=(iphoneos iphonesimulator)
-readonly DEPENDENCIES=(sdl3)
+readonly DEPENDENCIES=(sdl3 zlib)
 
 SDL3_VERSION="3.4.10"
 SDL3_ARCHIVE="SDL3-${SDL3_VERSION}.tar.gz"
 SDL3_URL="https://github.com/libsdl-org/SDL/releases/download/release-${SDL3_VERSION}/${SDL3_ARCHIVE}"
 SDL3_SHA256="12b34280415ec8418c864408b93d008a20a6530687ee613d60bfbd20411f2785"
+
+ZLIB_VERSION="1.3.2"
+ZLIB_ARCHIVE="zlib-${ZLIB_VERSION}.tar.gz"
+ZLIB_URL="https://zlib.net/fossils/${ZLIB_ARCHIVE}"
+ZLIB_SHA256="bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16"
 
 usage()
 {
@@ -262,10 +267,44 @@ probe_sdl3()
 	probe_cmake_package sdl3 lib/cmake/SDL3 sdl3
 }
 
+build_zlib()
+{
+	download_archive "$ZLIB_ARCHIVE" "$ZLIB_URL" "$ZLIB_SHA256"
+	prepare_source zlib "$ZLIB_ARCHIVE" "$ZLIB_SHA256" "zlib-$ZLIB_VERSION"
+
+	local sdk
+	for sdk in "${SDKS[@]}"; do
+		local dependency_root="$BUILD_ROOT/zlib"
+		local install_prefix="$dependency_root/install/$sdk"
+		local build_directory="$dependency_root/$sdk"
+		local arguments=()
+		while IFS= read -r argument; do
+			arguments+=("$argument")
+		done < <(cmake_ios_arguments "$sdk" "$install_prefix")
+
+		cmake -S "$dependency_root/src" -B "$build_directory" \
+			"${arguments[@]}" \
+			-DZLIB_BUILD_SHARED=OFF \
+			-DZLIB_BUILD_STATIC=ON \
+			-DZLIB_BUILD_TESTING=OFF
+		cmake --build "$build_directory" --target install --parallel
+		lipo -info "$install_prefix/lib/libz.a" | grep -q 'arm64' || fail "zlib $sdk archive is not arm64"
+	done
+
+	create_xcframework zlib libz.a Zlib
+	probe_zlib
+}
+
+probe_zlib()
+{
+	probe_cmake_package zlib lib/cmake/zlib zlib
+}
+
 build_dependency()
 {
 	case "$1" in
 		sdl3) build_sdl3 ;;
+		zlib) build_zlib ;;
 		*) fail "no builder for dependency: $1" ;;
 	esac
 }
@@ -274,6 +313,7 @@ verify_dependency()
 {
 	case "$1" in
 		sdl3) probe_sdl3 ;;
+		zlib) probe_zlib ;;
 		*) fail "no verifier for dependency: $1" ;;
 	esac
 }
@@ -320,11 +360,13 @@ case "$command" in
 		rm -rf "$BUILD_ROOT/$2"
 		case "$2" in
 			sdl3) rm -rf "$ARTIFACT_ROOT/SDL3.xcframework" ;;
+			zlib) rm -rf "$ARTIFACT_ROOT/Zlib.xcframework" ;;
 		esac
 		;;
 	list)
 		[[ $# -eq 1 ]] || { usage; exit 2; }
 		echo "sdl3 $SDL3_VERSION"
+		echo "zlib $ZLIB_VERSION"
 		;;
 	*)
 		usage
