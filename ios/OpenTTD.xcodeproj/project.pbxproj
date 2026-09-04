@@ -21,6 +21,7 @@
 		6F1B8A53286452D5E8B8906A /* SeedData in Resources */ = {isa = PBXBuildFile; fileRef = F6B4F02AA52F2D01E59C091F /* SeedData */; };
 		7E02A1D7F1B7F251CF3C9746 /* SDL3.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = B78AB34339A4F930DB694AD1 /* SDL3.xcframework */; };
 		89FE9071AE267E110381F1C4 /* OpenTTDEngine.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 97123F94A793BC9D25F43D2B /* OpenTTDEngine.xcframework */; };
+		950EC9B9CA8EEB0C85B4D7A0 /* CoreText.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BE153EB4B342BA12B2284567 /* CoreText.framework */; };
 		B3E9DFD080FA6E56AC42EE91 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6F0A8C67C968A99B10D101F7 /* Assets.xcassets */; };
 		BB4D44073C01152554AD6AB0 /* LZO.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 54D764641F164989CC68E487 /* LZO.xcframework */; };
 		BF55B228D27712C8BD237B21 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4F2137D0EB8CE86376E5B32F /* AVFoundation.framework */; };
@@ -44,6 +45,7 @@
 		97123F94A793BC9D25F43D2B /* OpenTTDEngine.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = OpenTTDEngine.xcframework; path = "../DerivedData/OpenTTD-engine/OpenTTDEngine.xcframework"; sourceTree = "<group>"; };
 		B31C015729C741BAB143EE42 /* LibLZMA.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = LibLZMA.xcframework; path = ../thirdparty/artifacts/LibLZMA.xcframework; sourceTree = "<group>"; };
 		B78AB34339A4F930DB694AD1 /* SDL3.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = SDL3.xcframework; path = ../thirdparty/artifacts/SDL3.xcframework; sourceTree = "<group>"; };
+		BE153EB4B342BA12B2284567 /* CoreText.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreText.framework; path = System/Library/Frameworks/CoreText.framework; sourceTree = SDKROOT; };
 		CFAB0ECF8D6F694D2CFBE1E2 /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
 		D5F6B776BA2176B5BBFB9317 /* GameController.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = GameController.framework; path = System/Library/Frameworks/GameController.framework; sourceTree = SDKROOT; };
 		DC2DF0381F53F3860267029C /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
@@ -68,6 +70,7 @@
 				BF55B228D27712C8BD237B21 /* AVFoundation.framework in Frameworks */,
 				DE3C7F260581561DF058AF0C /* CoreAudio.framework in Frameworks */,
 				E12D694EC02C9AADC2B08E63 /* CoreGraphics.framework in Frameworks */,
+				950EC9B9CA8EEB0C85B4D7A0 /* CoreText.framework in Frameworks */,
 				E2E8234D9785D35626CE4BF4 /* CoreMedia.framework in Frameworks */,
 				2852C53F0A7FF8ED3144E925 /* CoreVideo.framework in Frameworks */,
 				47FC259F525CA895C749C3AD /* Foundation.framework in Frameworks */,
@@ -141,6 +144,7 @@
 				CFAB0ECF8D6F694D2CFBE1E2 /* CoreAudio.framework */,
 				33100AC045A8CD5EA732D03A /* CoreGraphics.framework */,
 				5F504F695DC5968492C7C08E /* CoreMedia.framework */,
+				BE153EB4B342BA12B2284567 /* CoreText.framework */,
 				ECB3D60E56CD81218D5D22A8 /* CoreVideo.framework */,
 				529CE190AAD443096D95A69E /* Foundation.framework */,
 				D5F6B776BA2176B5BBFB9317 /* GameController.framework */,

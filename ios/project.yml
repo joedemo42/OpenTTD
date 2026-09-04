@@ -82,6 +82,7 @@ targets:
       - sdk: AVFoundation.framework
       - sdk: CoreAudio.framework
       - sdk: CoreGraphics.framework
+      - sdk: CoreText.framework
       - sdk: CoreMedia.framework
       - sdk: CoreVideo.framework
       - sdk: Foundation.framework
