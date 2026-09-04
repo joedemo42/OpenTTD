@@ -12,6 +12,13 @@ if(NOT OPTION_DEDICATED)
     )
 
     add_files(
+        ios_audio.h
+        ios_s.cpp
+        ios_s.h
+        CONDITION IOS
+    )
+
+    add_files(
         cocoa_s.cpp
         cocoa_s.h
         CONDITION APPLE AND NOT IOS

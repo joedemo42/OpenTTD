@@ -35,7 +35,7 @@ int OpenTTDIOSMain(int argc, char *argv[])
 		params.emplace_back(argv[i]);
 	}
 
-	params.insert(params.end(), {"-v", "ios", "-b", "32bpp-anim", "-s", "null", "-m", "null"});
+	params.insert(params.end(), {"-v", "ios", "-b", "32bpp-anim", "-s", "ios", "-m", "null"});
 	CrashLog::InitialiseCrashLog();
 	SetRandomSeed(time(nullptr));
 	signal(SIGPIPE, SIG_IGN);
