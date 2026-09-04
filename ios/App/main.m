@@ -61,6 +61,17 @@ int main(int argc, char *argv[])
 {
 	(void)argc;
 	(void)argv;
+	char data_error[512] = "";
+	if (!OpenTTDIOSPrepareDocuments(data_error, sizeof(data_error))) {
+		SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "IOS_PROBE data preparation failed: %s", data_error);
+		return 1;
+	}
+	if (!OpenTTDIOSValidateDocuments(data_error, sizeof(data_error))) {
+		SDL_LogError(SDL_LOG_CATEGORY_APPLICATION, "IOS_PROBE data validation failed: %s", data_error);
+		return 1;
+	}
+	SDL_Log("IOS_PROBE DATA root=%s", OpenTTDIOSGetDocumentsPath());
+
 	SDL_SetAppMetadata("OpenTTD", "0.1", "com.example.openttd");
 	SDL_SetHint(SDL_HINT_RENDER_DRIVER, "metal");
 	SDL_SetEventFilter(WatchLifecycle, NULL);

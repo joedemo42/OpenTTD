@@ -50,8 +50,11 @@ targets:
         UIViewControllerBasedStatusBarAppearance: false
     sources:
       - path: App/main.m
-    resources:
       - path: Assets.xcassets
+        buildPhase: resources
+      - path: ../DerivedData/DataPackage/SeedData
+        type: folder
+        buildPhase: resources
     settings:
       base:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

@@ -18,8 +18,10 @@
 		4D6E19F42572478133661454 /* LibPNG.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = E5603AE63DF34F6FED69F3F2 /* LibPNG.xcframework */; };
 		63211843CFC37F8A29539000 /* LibLZMA.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = B31C015729C741BAB143EE42 /* LibLZMA.xcframework */; };
 		6981AB42D5ED91D3295B05EF /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0948C0C1E819FCB36C18829A /* AudioToolbox.framework */; };
+		6F1B8A53286452D5E8B8906A /* SeedData in Resources */ = {isa = PBXBuildFile; fileRef = F6B4F02AA52F2D01E59C091F /* SeedData */; };
 		7E02A1D7F1B7F251CF3C9746 /* SDL3.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = B78AB34339A4F930DB694AD1 /* SDL3.xcframework */; };
 		89FE9071AE267E110381F1C4 /* OpenTTDEngine.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 97123F94A793BC9D25F43D2B /* OpenTTDEngine.xcframework */; };
+		B3E9DFD080FA6E56AC42EE91 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6F0A8C67C968A99B10D101F7 /* Assets.xcassets */; };
 		BB4D44073C01152554AD6AB0 /* LZO.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 54D764641F164989CC68E487 /* LZO.xcframework */; };
 		BF55B228D27712C8BD237B21 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4F2137D0EB8CE86376E5B32F /* AVFoundation.framework */; };
 		DE3C7F260581561DF058AF0C /* CoreAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CFAB0ECF8D6F694D2CFBE1E2 /* CoreAudio.framework */; };
@@ -37,6 +39,7 @@
 		5F504F695DC5968492C7C08E /* CoreMedia.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreMedia.framework; path = System/Library/Frameworks/CoreMedia.framework; sourceTree = SDKROOT; };
 		6C1E95F92E6374B4B07A0518 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
 		6EC6113A62B052F0DDAE811B /* OpenTTD.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = OpenTTD.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		6F0A8C67C968A99B10D101F7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		7F944515AEEDF2B228EB6394 /* Zlib.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = Zlib.xcframework; path = ../thirdparty/artifacts/Zlib.xcframework; sourceTree = "<group>"; };
 		97123F94A793BC9D25F43D2B /* OpenTTDEngine.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = OpenTTDEngine.xcframework; path = "../DerivedData/OpenTTD-engine/OpenTTDEngine.xcframework"; sourceTree = "<group>"; };
 		B31C015729C741BAB143EE42 /* LibLZMA.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = LibLZMA.xcframework; path = ../thirdparty/artifacts/LibLZMA.xcframework; sourceTree = "<group>"; };
@@ -47,6 +50,7 @@
 		E5603AE63DF34F6FED69F3F2 /* LibPNG.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = LibPNG.xcframework; path = ../thirdparty/artifacts/LibPNG.xcframework; sourceTree = "<group>"; };
 		ECB3D60E56CD81218D5D22A8 /* CoreVideo.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreVideo.framework; path = System/Library/Frameworks/CoreVideo.framework; sourceTree = SDKROOT; };
 		F467F5B2CCA75C74DCCDF4A3 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
+		F6B4F02AA52F2D01E59C091F /* SeedData */ = {isa = PBXFileReference; lastKnownFileType = folder; name = SeedData; path = ../DerivedData/DataPackage/SeedData; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -85,10 +89,20 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		87658B2C39F91B47A5EE68F3 /* DerivedData */ = {
+			isa = PBXGroup;
+			children = (
+				DFF8F242D15A894F14ACAF7C /* DataPackage */,
+			);
+			path = DerivedData;
+			sourceTree = "<group>";
+		};
 		A6C15A571F87B955C59A37CD = {
 			isa = PBXGroup;
 			children = (
+				6F0A8C67C968A99B10D101F7 /* Assets.xcassets */,
 				ADE31DB5E525A379045A3D29 /* App */,
+				CF7EE012BE1534CF179EA1CB /* OpenTTD */,
 				E2F2D454E7E4FCCAE96D6613 /* Frameworks */,
 				2CC208DAD2692E3D739B9815 /* Products */,
 			);
@@ -100,6 +114,23 @@
 				0CDC5B368BC0EE65287A798C /* main.m */,
 			);
 			path = App;
+			sourceTree = "<group>";
+		};
+		CF7EE012BE1534CF179EA1CB /* OpenTTD */ = {
+			isa = PBXGroup;
+			children = (
+				87658B2C39F91B47A5EE68F3 /* DerivedData */,
+			);
+			name = OpenTTD;
+			path = ..;
+			sourceTree = "<group>";
+		};
+		DFF8F242D15A894F14ACAF7C /* DataPackage */ = {
+			isa = PBXGroup;
+			children = (
+				F6B4F02AA52F2D01E59C091F /* SeedData */,
+			);
+			path = DataPackage;
 			sourceTree = "<group>";
 		};
 		E2F2D454E7E4FCCAE96D6613 /* Frameworks */ = {
@@ -134,6 +165,7 @@
 			buildConfigurationList = C1AD2C3F4C8DCE6D2CBD4A8E /* Build configuration list for PBXNativeTarget "OpenTTD" */;
 			buildPhases = (
 				8350C9B2312B8CFAAF811AEF /* Sources */,
+				AEBB3032E884A89F88256CD8 /* Resources */,
 				A348D50955C418EF37A47F52 /* Frameworks */,
 			);
 			buildRules = (
@@ -180,6 +212,18 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		AEBB3032E884A89F88256CD8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B3E9DFD080FA6E56AC42EE91 /* Assets.xcassets in Resources */,
+				6F1B8A53286452D5E8B8906A /* SeedData in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		8350C9B2312B8CFAAF811AEF /* Sources */ = {
