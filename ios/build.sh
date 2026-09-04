@@ -102,7 +102,7 @@ build_engine_slice()
 	dependency_root="$REPO_ROOT/thirdparty/artifacts"
 	build_directory="$ENGINE_ROOT/$sdk"
 
-	local signature="Ninja|Release|$sdk_path|arm64|$IOS_MIN_VERSION|$compiler|$artifact_slice|parent-git|documents-root-v1"
+	local signature="Ninja|Release|$sdk_path|arm64|$IOS_MIN_VERSION|$compiler|$artifact_slice|parent-git|documents-root-v1|sdl3-metal-video-v1"
 	local stamp="$build_directory/ios-config.stamp"
 	if [[ ! -f "$build_directory/build.ninja" || ! -f "$stamp" || "$(<"$stamp")" != "$signature" ]]; then
 		cmake -E remove_directory "$build_directory"
@@ -117,6 +117,7 @@ build_engine_slice()
 			-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
 			-DHOST_BINARY_DIR="$ENGINE_ROOT/host" \
 			-DOPTION_USE_PARENT_GIT=ON \
+			-DSDL3_INCLUDE_DIR="$dependency_root/SDL3.xcframework/$artifact_slice/Headers" \
 			-DZLIB_INCLUDE_DIR="$dependency_root/Zlib.xcframework/$artifact_slice/Headers" \
 			-DZLIB_LIBRARY="$dependency_root/Zlib.xcframework/$artifact_slice/libz.a" \
 			-DLIBLZMA_INCLUDE_DIR="$dependency_root/LibLZMA.xcframework/$artifact_slice/Headers" \
@@ -513,22 +514,24 @@ test_simulator()
 	if (( width < height )); then
 		sips --rotate -90 "$LOG_DIR/skeleton.png" >/dev/null
 	fi
-	grep -Fq 'IOS_PROBE ENGINE revision=' "$LOG_DIR/simulator.log" || \
+	grep -Fq 'IOS_ENGINE START revision=' "$LOG_DIR/simulator.log" || \
 		fail "OpenTTD engine marker missing from simulator log"
-	grep -Fq 'IOS_PROBE DATA root=' "$LOG_DIR/simulator.log" || \
+	grep -Fq 'IOS_ENGINE DATA root=' "$LOG_DIR/simulator.log" || \
 		fail "Documents data marker missing from simulator log"
-	if grep -F 'IOS_PROBE DATA root=' "$LOG_DIR/simulator.log" | grep -Fq '/Documents/OpenTTD'; then
+	if grep -F 'IOS_ENGINE DATA root=' "$LOG_DIR/simulator.log" | grep -Fq '/Documents/OpenTTD'; then
 		fail "simulator used the forbidden Documents/OpenTTD wrapper"
 	fi
-	grep -Fq 'IOS_PROBE READY renderer=metal' "$LOG_DIR/simulator.log" || \
+	grep -Fq 'IOS_VIDEO READY renderer=metal' "$LOG_DIR/simulator.log" || \
 		fail "Metal readiness marker missing from simulator log"
+	grep -Fq 'IOS_VIDEO PRESENT first_dirty=' "$LOG_DIR/simulator.log" || \
+		fail "OpenTTD framebuffer presentation marker missing from simulator log"
 	local container
 	container="$(xcrun simctl get_app_container "$simulator" "$BUNDLE_ID" data)"
 	[[ ! -e "$container/Documents/OpenTTD" ]] || fail "simulator contains the forbidden Documents/OpenTTD wrapper"
 	[[ -f "$container/Documents/baseset/opengfx-8.0.tar" ]] || fail "OpenGFX was not seeded into Documents/baseset"
 	[[ -f "$container/Documents/baseset/opensfx-1.0.3.tar" ]] || fail "OpenSFX was not seeded into Documents/baseset"
 	[[ -f "$container/Documents/baseset/openmsx-0.4.2/openmsx.obm" ]] || fail "OpenMSX was not seeded into Documents/baseset"
-	echo "Simulator probe passed; logs and screenshot are in $LOG_DIR"
+	echo "Simulator engine test passed; logs and screenshot are in $LOG_DIR"
 }
 
 test_device()
@@ -538,22 +541,48 @@ test_device()
 	[[ "$seconds" =~ ^[0-9]+$ ]] || fail "test duration must be a whole number of seconds"
 	install_app device "$selector"
 	mkdir -p "$LOG_DIR"
-	xcrun devicectl device process launch --terminate-existing --console \
+	local console_timeout=$((seconds + 60))
+	xcrun devicectl device process launch --terminate-existing --console --timeout "$console_timeout" \
 		--device "$selector" "$BUNDLE_ID" > "$LOG_DIR/device-debugger.log" 2>&1 &
 	local console_pid=$!
+	local launch_wait=0
+	while ! grep -Fq 'IOS_ENGINE START revision=' "$LOG_DIR/device-debugger.log"; do
+		if ! kill -0 "$console_pid" 2>/dev/null; then
+			wait "$console_pid" 2>/dev/null || true
+			fail "device app exited before the engine started"
+		fi
+		if (( launch_wait >= 30 )); then
+			kill -KILL "$console_pid" 2>/dev/null || true
+			wait "$console_pid" 2>/dev/null || true
+			fail "device engine did not start within 30 seconds"
+		fi
+		sleep 1
+		launch_wait=$((launch_wait + 1))
+	done
+
+	local device_pid
+	device_pid="$(sed -nE '/OpenTTD\[[0-9]+:/ { s/.*OpenTTD\[([0-9]+):.*/\1/p; q; }' "$LOG_DIR/device-debugger.log")"
+	[[ -n "$device_pid" ]] || fail "could not determine the device process identifier"
 	sleep "$seconds"
-	kill -INT "$console_pid" 2>/dev/null || true
-	wait "$console_pid" || true
-	grep -Fq 'IOS_PROBE ENGINE revision=' "$LOG_DIR/device-debugger.log" || \
+	if ! kill -0 "$console_pid" 2>/dev/null; then
+		wait "$console_pid" 2>/dev/null || true
+		fail "device app exited before the $seconds-second stability interval"
+	fi
+	xcrun devicectl device process terminate --device "$selector" --pid "$device_pid"
+	kill -KILL "$console_pid" 2>/dev/null || true
+	wait "$console_pid" 2>/dev/null || true
+	grep -Fq 'IOS_ENGINE START revision=' "$LOG_DIR/device-debugger.log" || \
 		fail "OpenTTD engine marker missing from device console"
-	grep -Fq 'IOS_PROBE DATA root=' "$LOG_DIR/device-debugger.log" || \
+	grep -Fq 'IOS_ENGINE DATA root=' "$LOG_DIR/device-debugger.log" || \
 		fail "Documents data marker missing from device console"
-	if grep -F 'IOS_PROBE DATA root=' "$LOG_DIR/device-debugger.log" | grep -Fq '/Documents/OpenTTD'; then
+	if grep -F 'IOS_ENGINE DATA root=' "$LOG_DIR/device-debugger.log" | grep -Fq '/Documents/OpenTTD'; then
 		fail "device used the forbidden Documents/OpenTTD wrapper"
 	fi
-	grep -Fq 'IOS_PROBE READY renderer=metal' "$LOG_DIR/device-debugger.log" || \
+	grep -Fq 'IOS_VIDEO READY renderer=metal' "$LOG_DIR/device-debugger.log" || \
 		fail "Metal readiness marker missing from device console"
-	echo "Device probe passed for $seconds seconds; console output is in $LOG_DIR/device-debugger.log"
+	grep -Fq 'IOS_VIDEO PRESENT first_dirty=' "$LOG_DIR/device-debugger.log" || \
+		fail "OpenTTD framebuffer presentation marker missing from device console"
+	echo "Device engine test passed for $seconds seconds after startup; console output is in $LOG_DIR/device-debugger.log"
 }
 
 archive_app()

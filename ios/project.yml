@@ -61,6 +61,7 @@ targets:
         OTHER_LDFLAGS:
           - "$(inherited)"
           - -ObjC
+          - "-Wl,-force_load,$(BUILT_PRODUCTS_DIR)/libopenttd_engine.a"
           - -lc++
           - -lm
           - -lpthread
