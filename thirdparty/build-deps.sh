@@ -12,7 +12,7 @@ PROBE_ROOT="$SCRIPT_DIR/probes"
 IOS_MIN_VERSION="${IOS_MIN_VERSION:-26.0}"
 
 readonly SDKS=(iphoneos iphonesimulator)
-readonly DEPENDENCIES=(sdl3 zlib)
+readonly DEPENDENCIES=(sdl3 zlib xz)
 
 SDL3_VERSION="3.4.10"
 SDL3_ARCHIVE="SDL3-${SDL3_VERSION}.tar.gz"
@@ -23,6 +23,11 @@ ZLIB_VERSION="1.3.2"
 ZLIB_ARCHIVE="zlib-${ZLIB_VERSION}.tar.gz"
 ZLIB_URL="https://zlib.net/fossils/${ZLIB_ARCHIVE}"
 ZLIB_SHA256="bb329a0a2cd0274d05519d61c667c062e06990d72e125ee2dfa8de64f0119d16"
+
+XZ_VERSION="5.8.3"
+XZ_ARCHIVE="xz-${XZ_VERSION}.tar.gz"
+XZ_URL="https://github.com/tukaani-project/xz/releases/download/v${XZ_VERSION}/${XZ_ARCHIVE}"
+XZ_SHA256="3d3a1b973af218114f4f889bbaa2f4c037deaae0c8e815eec381c3d546b974a0"
 
 usage()
 {
@@ -300,11 +305,50 @@ probe_zlib()
 	probe_cmake_package zlib lib/cmake/zlib zlib
 }
 
+build_xz()
+{
+	download_archive "$XZ_ARCHIVE" "$XZ_URL" "$XZ_SHA256"
+	prepare_source xz "$XZ_ARCHIVE" "$XZ_SHA256" "xz-$XZ_VERSION"
+
+	local sdk
+	for sdk in "${SDKS[@]}"; do
+		local dependency_root="$BUILD_ROOT/xz"
+		local install_prefix="$dependency_root/install/$sdk"
+		local build_directory="$dependency_root/$sdk"
+		local arguments=()
+		while IFS= read -r argument; do
+			arguments+=("$argument")
+		done < <(cmake_ios_arguments "$sdk" "$install_prefix")
+
+		cmake -S "$dependency_root/src" -B "$build_directory" \
+			"${arguments[@]}" \
+			-DBUILD_SHARED_LIBS=OFF \
+			-DBUILD_TESTING=OFF \
+			-DXZ_DOC=OFF \
+			-DXZ_NLS=OFF \
+			-DXZ_TOOL_LZMADEC=OFF \
+			-DXZ_TOOL_LZMAINFO=OFF \
+			-DXZ_TOOL_XZ=OFF \
+			-DXZ_TOOL_XZDEC=OFF
+		cmake --build "$build_directory" --target install --parallel
+		lipo -info "$install_prefix/lib/liblzma.a" | grep -q 'arm64' || fail "liblzma $sdk archive is not arm64"
+	done
+
+	create_xcframework xz liblzma.a LibLZMA
+	probe_xz
+}
+
+probe_xz()
+{
+	probe_cmake_package xz lib/cmake/liblzma xz
+}
+
 build_dependency()
 {
 	case "$1" in
 		sdl3) build_sdl3 ;;
 		zlib) build_zlib ;;
+		xz) build_xz ;;
 		*) fail "no builder for dependency: $1" ;;
 	esac
 }
@@ -314,6 +358,7 @@ verify_dependency()
 	case "$1" in
 		sdl3) probe_sdl3 ;;
 		zlib) probe_zlib ;;
+		xz) probe_xz ;;
 		*) fail "no verifier for dependency: $1" ;;
 	esac
 }
@@ -361,12 +406,14 @@ case "$command" in
 		case "$2" in
 			sdl3) rm -rf "$ARTIFACT_ROOT/SDL3.xcframework" ;;
 			zlib) rm -rf "$ARTIFACT_ROOT/Zlib.xcframework" ;;
+			xz) rm -rf "$ARTIFACT_ROOT/LibLZMA.xcframework" ;;
 		esac
 		;;
 	list)
 		[[ $# -eq 1 ]] || { usage; exit 2; }
 		echo "sdl3 $SDL3_VERSION"
 		echo "zlib $ZLIB_VERSION"
+		echo "xz $XZ_VERSION"
 		;;
 	*)
 		usage
