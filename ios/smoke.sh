@@ -93,8 +93,7 @@ wait_for_text()
 configure_host_tests()
 {
 	cmake -S "$SOURCE_DIR" -B "$HOST_TESTS" -G Ninja \
-		-DCMAKE_BUILD_TYPE=Debug \
-		-DOPTION_USE_PARENT_GIT=ON
+		-DCMAKE_BUILD_TYPE=Debug
 }
 
 # The script/savegame regressions need a usable base graphics set, as upstream CI provides.

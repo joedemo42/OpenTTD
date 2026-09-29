@@ -21,7 +21,7 @@ IOS_MIN_VERSION="26.0"
 ENGINE_ROOT="$DERIVED_DATA/OpenTTD-engine"
 ENGINE_XCFRAMEWORK="$ENGINE_ROOT/OpenTTDEngine.xcframework"
 # Bump when a CMake cache default changes, so every engine tree is configured afresh.
-ENGINE_CONFIG_TAG="parent-git|documents-root-v1|sdl3-metal-video-v1"
+ENGINE_CONFIG_TAG="documents-root-v1|sdl3-metal-video-v1"
 DATA_STAGE="$DERIVED_DATA/DataPackage"
 SEED_DATA="$DATA_STAGE/SeedData"
 IPA_DIR="$DERIVED_DATA/ipa"
@@ -283,7 +283,6 @@ engine_arguments()
 		-DCMAKE_POSITION_INDEPENDENT_CODE=ON \
 		-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
 		-DHOST_BINARY_DIR="$(cmake_tree host)" \
-		-DOPTION_USE_PARENT_GIT=ON \
 		-DSDL3_INCLUDE_DIR="$DEPS_ARTIFACTS/SDL3.xcframework/$slice/Headers" \
 		-DZLIB_INCLUDE_DIR="$DEPS_ARTIFACTS/Zlib.xcframework/$slice/Headers" \
 		-DZLIB_LIBRARY="$DEPS_ARTIFACTS/Zlib.xcframework/$slice/libz.a" \
