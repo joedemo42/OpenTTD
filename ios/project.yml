@@ -68,15 +68,15 @@ targets:
     dependencies:
       - framework: ../DerivedData/OpenTTD-engine/OpenTTDEngine.xcframework
         embed: false
-      - framework: ../thirdparty/artifacts/SDL3.xcframework
+      - framework: ../ios-deps/artifacts/SDL3.xcframework
         embed: false
-      - framework: ../thirdparty/artifacts/Zlib.xcframework
+      - framework: ../ios-deps/artifacts/Zlib.xcframework
         embed: false
-      - framework: ../thirdparty/artifacts/LibLZMA.xcframework
+      - framework: ../ios-deps/artifacts/LibLZMA.xcframework
         embed: false
-      - framework: ../thirdparty/artifacts/LibPNG.xcframework
+      - framework: ../ios-deps/artifacts/LibPNG.xcframework
         embed: false
-      - framework: ../thirdparty/artifacts/LZO.xcframework
+      - framework: ../ios-deps/artifacts/LZO.xcframework
         embed: false
       - sdk: AudioToolbox.framework
       - sdk: AVFoundation.framework

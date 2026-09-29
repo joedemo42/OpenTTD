@@ -58,11 +58,11 @@ require_artifacts()
 {
 	local artifact
 	for artifact in SDL3 Zlib LibLZMA LibPNG LZO; do
-		[[ -d "$REPO_ROOT/thirdparty/artifacts/$artifact.xcframework" ]] || \
-			fail "missing $artifact.xcframework; run thirdparty/build-deps.sh build all"
+		[[ -d "$REPO_ROOT/ios-deps/artifacts/$artifact.xcframework" ]] || \
+			fail "missing $artifact.xcframework; run ios-deps/build-deps.sh build all"
 	done
-	[[ -d "$REPO_ROOT/thirdparty/artifacts/TimGM6mb" ]] || \
-		fail "missing TimGM6mb SoundFont; run thirdparty/build-deps.sh build timgm6mb"
+	[[ -d "$REPO_ROOT/ios-deps/artifacts/TimGM6mb" ]] || \
+		fail "missing TimGM6mb SoundFont; run ios-deps/build-deps.sh build timgm6mb"
 }
 
 require_engine_artifact()
@@ -101,7 +101,7 @@ build_engine_slice()
 	local sdk_path compiler dependency_root build_directory
 	sdk_path="$(xcrun --sdk "$sdk" --show-sdk-path)"
 	compiler="$(xcrun --find clang++)"
-	dependency_root="$REPO_ROOT/thirdparty/artifacts"
+	dependency_root="$REPO_ROOT/ios-deps/artifacts"
 	build_directory="$ENGINE_ROOT/$sdk"
 
 	local signature="Ninja|Release|$sdk_path|arm64|$IOS_MIN_VERSION|$compiler|$artifact_slice|parent-git|documents-root-v1|sdl3-metal-video-v1"
@@ -366,9 +366,9 @@ prepare_data()
 	local fingerprint
 	fingerprint="documents-root-v1:$(shasum -a 256 \
 		"$REPO_ROOT"/Data/*.zip \
-		"$REPO_ROOT"/thirdparty/artifacts/TimGM6mb/TimGM6mb.sf2 \
-		"$REPO_ROOT"/thirdparty/artifacts/TimGM6mb/LICENSE.txt \
-		"$REPO_ROOT"/thirdparty/artifacts/TimGM6mb/COPYING.md \
+		"$REPO_ROOT"/ios-deps/artifacts/TimGM6mb/TimGM6mb.sf2 \
+		"$REPO_ROOT"/ios-deps/artifacts/TimGM6mb/LICENSE.txt \
+		"$REPO_ROOT"/ios-deps/artifacts/TimGM6mb/COPYING.md \
 		"$SOURCE_DIR/media/baseset/openttd.grf" \
 		"$SOURCE_DIR/media/baseset/opntitle.dat" \
 		"$SOURCE_DIR/media/baseset/orig_extra.grf" \
@@ -403,9 +403,9 @@ prepare_data()
 	unzip -p "$REPO_ROOT/Data/openmsx-0.4.2-all.zip" '*.tar' | \
 		tar -xf - -C "$seed/baseset"
 	cp \
-		"$REPO_ROOT/thirdparty/artifacts/TimGM6mb/TimGM6mb.sf2" \
-		"$REPO_ROOT/thirdparty/artifacts/TimGM6mb/LICENSE.txt" \
-		"$REPO_ROOT/thirdparty/artifacts/TimGM6mb/COPYING.md" \
+		"$REPO_ROOT/ios-deps/artifacts/TimGM6mb/TimGM6mb.sf2" \
+		"$REPO_ROOT/ios-deps/artifacts/TimGM6mb/LICENSE.txt" \
+		"$REPO_ROOT/ios-deps/artifacts/TimGM6mb/COPYING.md" \
 		"$seed/baseset/timgm6mb/"
 	cp \
 		"$SOURCE_DIR/media/baseset/openttd.grf" \
