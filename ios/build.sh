@@ -1,45 +1,64 @@
 #!/usr/bin/env bash
+# Builds, installs, runs and packages the OpenTTD iOS app.
 
 set -euo pipefail
 
 IOS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$IOS_DIR/.." && pwd)"
 DERIVED_DATA="$REPO_ROOT/DerivedData"
+LOG_DIR="$REPO_ROOT/log"
+SOURCE_DIR="$REPO_ROOT/source"
+DEPS_SCRIPT="$REPO_ROOT/ios-deps/build-deps.sh"
+DEPS_ARTIFACTS="$REPO_ROOT/ios-deps/artifacts"
+ARCHIVE_DIR="$REPO_ROOT/archive"
+BUILD_NUMBER_FILE="$IOS_DIR/BUILD_NUMBER"
 PROJECT="$IOS_DIR/OpenTTD.xcodeproj"
 SCHEME="OpenTTD"
 BUNDLE_ID="com.example.openttd"
 DEFAULT_SIMULATOR="iPad Air 11-inch (M4)"
 DEFAULT_DEVICE="OldPad"
-LOG_DIR="$REPO_ROOT/log"
-DATA_STAGE="$DERIVED_DATA/DataPackage"
-SEED_DATA="$DATA_STAGE/SeedData"
-SOURCE_DIR="$REPO_ROOT/source"
+IOS_MIN_VERSION="26.0"
 ENGINE_ROOT="$DERIVED_DATA/OpenTTD-engine"
 ENGINE_XCFRAMEWORK="$ENGINE_ROOT/OpenTTDEngine.xcframework"
-IOS_MIN_VERSION="26.0"
+# Bump when a CMake cache default changes, so every engine tree is configured afresh.
+ENGINE_CONFIG_TAG="parent-git|documents-root-v1|sdl3-metal-video-v1"
+DATA_STAGE="$DERIVED_DATA/DataPackage"
+SEED_DATA="$DATA_STAGE/SeedData"
+IPA_DIR="$DERIVED_DATA/ipa"
+REPO_SERVER_URL="http://repo-server.invalid/upload/"
+
+script_name()
+{
+	local path="$0"
+	[[ "$path" != /* ]] || path="${path#"$PWD"/}"
+	[[ "$path" != /* ]] || path="${path#"$REPO_ROOT"/}"
+	printf '%s' "$path"
+}
 
 usage()
 {
 	cat <<EOF
-Usage: $(basename "$0") <command> [arguments]
+Usage: $(script_name) <command> [args] [options]
+Target: [simulator|device|both] | --simulator <name|UDID> | --device <name|UDID>
+        Default: simulator "$DEFAULT_SIMULATOR"; the default device is "$DEFAULT_DEVICE".
 
-Commands:
-  engine <simulator|device|all>    Build native generators and iOS engine archive(s).
-  test-host                        Build and run the upstream host tests.
-  generate                         Generate OpenTTD.xcodeproj with XcodeGen.
-  build <simulator|device> [name]  Incrementally build for arm64.
-  install <simulator|device> [name-or-UUID]
-  run <simulator|device> [name-or-UUID]
-  test-simulator [name-or-UUID] [seconds]
-  test-device [name-or-UUID] [seconds]
-  data-zip                         Stage base sets and create a Documents ZIP.
-  data-verify                      Verify staged layout and upstream discovery.
-  data-push <simulator|device> [name-or-UUID]
-  archive                          Create a signed device archive.
-  ipa <signed|unsigned>            Package the device app as an IPA.
-
-Defaults: simulator "$DEFAULT_SIMULATOR", device "$DEFAULT_DEVICE".
-All build products stay under $DERIVED_DATA.
+build     [simulator|device|both]
+          Missing deps, engine and app; ios/BUILD_NUMBER +1 per invocation. Default: simulator
+install   [target] [--no-build]
+          Build and install the app. Default: simulator
+run       [target] [--seconds <1-45>] [--label <name>] [--no-build] [--no-install] [-- <app args>]
+          Build, install, run non-interactively → log/debugger.log, log/<label>.{log,png}. Default: 45 s
+          --no-build: use last build. --no-install: launch installed app (implies --no-build)
+ipa       [--unsigned]
+          Device build → IPA in DerivedData/ipa. Default: signed
+push
+          Signed IPA of the current tree → archive/ → repo server
+documents zip
+          Documents payload → DerivedData/ipa/Documents.zip
+documents install [target]
+          Copy the payload into the installed app's Documents, no reinstall. Default: simulator
+clean
+          Remove app build output (DerivedData)
 EOF
 }
 
@@ -49,244 +68,154 @@ fail()
 	exit 1
 }
 
+usage_error()
+{
+	echo "error: $*" >&2
+	echo "Run '$(script_name) --help' for usage." >&2
+	exit 1
+}
+
 require_tool()
 {
-	command -v "$1" >/dev/null 2>&1 || fail "required tool not found: $1"
-}
-
-require_artifacts()
-{
-	local artifact
-	for artifact in SDL3 Zlib LibLZMA LibPNG LZO; do
-		[[ -d "$REPO_ROOT/ios-deps/artifacts/$artifact.xcframework" ]] || \
-			fail "missing $artifact.xcframework; run ios-deps/build-deps.sh build all"
+	local tool
+	for tool in "$@"; do
+		command -v "$tool" >/dev/null 2>&1 || fail "required tool not found: $tool"
 	done
-	[[ -d "$REPO_ROOT/ios-deps/artifacts/TimGM6mb" ]] || \
-		fail "missing TimGM6mb SoundFont; run ios-deps/build-deps.sh build timgm6mb"
 }
 
-require_engine_artifact()
+# Command line --------------------------------------------------------------
+
+POSITIONAL=()
+APP_ARGS=()
+GIVEN=""
+NO_BUILD=no
+NO_INSTALL=no
+UNSIGNED=no
+RUN_SECONDS=45
+LABEL=""
+SIMULATOR_OPTION=""
+DEVICE_OPTION=""
+PLATFORMS=""
+SIMULATOR="$DEFAULT_SIMULATOR"
+DEVICE="$DEFAULT_DEVICE"
+
+parse_arguments()
 {
-	[[ -d "$ENGINE_XCFRAMEWORK" ]] || \
-		fail "missing OpenTTDEngine.xcframework; run ios/build.sh engine all"
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			-h|--help)
+				usage
+				exit 0
+				;;
+			--simulator|--device|--seconds|--label)
+				[[ $# -ge 2 ]] || usage_error "$1 needs a value"
+				case "$1" in
+					--simulator) SIMULATOR_OPTION="$2" ;;
+					--device) DEVICE_OPTION="$2" ;;
+					--seconds) RUN_SECONDS="$2" ;;
+					--label) LABEL="$2" ;;
+				esac
+				GIVEN="$GIVEN $1"
+				shift 2
+				;;
+			--no-build) NO_BUILD=yes; GIVEN="$GIVEN $1"; shift ;;
+			--no-install) NO_INSTALL=yes; GIVEN="$GIVEN $1"; shift ;;
+			--unsigned) UNSIGNED=yes; GIVEN="$GIVEN $1"; shift ;;
+			--)
+				shift
+				APP_ARGS=("$@")
+				GIVEN="$GIVEN --"
+				break
+				;;
+			-*) usage_error "unknown option: $1" ;;
+			*) POSITIONAL+=("$1"); shift ;;
+		esac
+	done
 }
 
-build_host_tools()
+# Rejects surplus positional arguments and options the command does not take.
+allow()
 {
-	require_tool cmake
-	require_tool ninja
-	local build_directory="$ENGINE_ROOT/host"
-	local signature="Ninja|Release|tools|$(command -v c++)"
-	local stamp="$build_directory/ios-config.stamp"
-	if [[ ! -f "$build_directory/build.ninja" || ! -f "$stamp" || "$(<"$stamp")" != "$signature" ]]; then
-		cmake -E remove_directory "$build_directory"
-		cmake -S "$SOURCE_DIR" -B "$build_directory" -G Ninja \
-			-DCMAKE_BUILD_TYPE=Release \
-			-DOPTION_TOOLS_ONLY=ON
-		printf '%s\n' "$signature" > "$stamp"
-	fi
-	cmake --build "$build_directory" --target tools --parallel
+	local maximum="$1"
+	shift
+	[[ ${#POSITIONAL[@]} -le $maximum ]] || usage_error "too many arguments for $COMMAND"
+	local option
+	for option in $GIVEN; do
+		case " $* " in
+			*" $option "*) ;;
+			*) usage_error "$COMMAND does not take $option" ;;
+		esac
+	done
 }
 
-build_engine_slice()
+# Sets PLATFORMS, SIMULATOR and DEVICE from [simulator|device|both] and the target options.
+resolve_targets()
 {
-	local sdk="$1"
-	local artifact_slice
-	case "$sdk" in
-		iphoneos) artifact_slice="ios-arm64" ;;
-		iphonesimulator) artifact_slice="ios-arm64-simulator" ;;
-		*) fail "unknown engine SDK: $sdk" ;;
-	esac
-
-	local sdk_path compiler dependency_root build_directory
-	sdk_path="$(xcrun --sdk "$sdk" --show-sdk-path)"
-	compiler="$(xcrun --find clang++)"
-	dependency_root="$REPO_ROOT/ios-deps/artifacts"
-	build_directory="$ENGINE_ROOT/$sdk"
-
-	local signature="Ninja|Release|$sdk_path|arm64|$IOS_MIN_VERSION|$compiler|$artifact_slice|parent-git|documents-root-v1|sdl3-metal-video-v1"
-	local stamp="$build_directory/ios-config.stamp"
-	if [[ ! -f "$build_directory/build.ninja" || ! -f "$stamp" || "$(<"$stamp")" != "$signature" ]]; then
-		cmake -E remove_directory "$build_directory"
-		cmake -S "$SOURCE_DIR" -B "$build_directory" -G Ninja \
-			-DCMAKE_SYSTEM_NAME=iOS \
-			-DCMAKE_OSX_SYSROOT="$sdk_path" \
-			-DCMAKE_OSX_ARCHITECTURES=arm64 \
-			-DCMAKE_OSX_DEPLOYMENT_TARGET="$IOS_MIN_VERSION" \
-			-DCMAKE_CXX_COMPILER="$compiler" \
-			-DCMAKE_BUILD_TYPE=Release \
-			-DCMAKE_POSITION_INDEPENDENT_CODE=ON \
-			-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
-			-DHOST_BINARY_DIR="$ENGINE_ROOT/host" \
-			-DOPTION_USE_PARENT_GIT=ON \
-			-DSDL3_INCLUDE_DIR="$dependency_root/SDL3.xcframework/$artifact_slice/Headers" \
-			-DZLIB_INCLUDE_DIR="$dependency_root/Zlib.xcframework/$artifact_slice/Headers" \
-			-DZLIB_LIBRARY="$dependency_root/Zlib.xcframework/$artifact_slice/libz.a" \
-			-DLIBLZMA_INCLUDE_DIR="$dependency_root/LibLZMA.xcframework/$artifact_slice/Headers" \
-			-DLIBLZMA_LIBRARY="$dependency_root/LibLZMA.xcframework/$artifact_slice/liblzma.a" \
-			-DPNG_PNG_INCLUDE_DIR="$dependency_root/LibPNG.xcframework/$artifact_slice/Headers" \
-			-DPNG_LIBRARY="$dependency_root/LibPNG.xcframework/$artifact_slice/libpng16.a" \
-			-DLZO_INCLUDE_DIR="$dependency_root/LZO.xcframework/$artifact_slice/Headers" \
-			-DLZO_LIBRARY="$dependency_root/LZO.xcframework/$artifact_slice/liblzo2.a"
-		printf '%s\n' "$signature" > "$stamp"
-	fi
-	cmake --build "$build_directory" --target openttd_lib --parallel
-
-	local archive="$build_directory/libopenttd_engine.a"
-	[[ -f "$archive" ]] || fail "$sdk engine archive was not produced"
-	lipo -info "$archive" | grep -q 'arm64' || fail "$sdk engine archive is not arm64"
-}
-
-package_engine()
-{
-	local device_archive="$ENGINE_ROOT/iphoneos/libopenttd_engine.a"
-	local simulator_archive="$ENGINE_ROOT/iphonesimulator/libopenttd_engine.a"
-	[[ -f "$device_archive" && -f "$simulator_archive" ]] || return
-
-	if [[ -f "$ENGINE_XCFRAMEWORK/Info.plist" && \
-		"$ENGINE_XCFRAMEWORK/Info.plist" -nt "$device_archive" && \
-		"$ENGINE_XCFRAMEWORK/Info.plist" -nt "$simulator_archive" ]]; then
-		echo "Using packaged OpenTTD engine"
-		return
-	fi
-
-	local staging="$ENGINE_ROOT/OpenTTDEngine.staging.xcframework"
-	rm -rf "$staging"
-	xcodebuild -create-xcframework \
-		-library "$device_archive" \
-		-headers "$SOURCE_DIR/src/os/ios" \
-		-library "$simulator_archive" \
-		-headers "$SOURCE_DIR/src/os/ios" \
-		-output "$staging"
-	rm -rf "$ENGINE_XCFRAMEWORK"
-	mv "$staging" "$ENGINE_XCFRAMEWORK"
-	plutil -lint "$ENGINE_XCFRAMEWORK/Info.plist" >/dev/null
-	echo "Created $ENGINE_XCFRAMEWORK"
-}
-
-build_engine()
-{
-	local selection="$1"
-	require_artifacts
-	require_tool cmake
-	require_tool lipo
-	require_tool ninja
-	require_tool plutil
-	build_host_tools
-	case "$selection" in
-		simulator) build_engine_slice iphonesimulator ;;
-		device) build_engine_slice iphoneos ;;
-		all)
-			build_engine_slice iphoneos
-			build_engine_slice iphonesimulator
-			;;
-		*) fail "engine platform must be simulator, device, or all" ;;
-	esac
-	package_engine
-}
-
-test_host()
-{
-	require_tool cmake
-	require_tool ctest
-	require_tool ninja
-	require_tool unzip
-	local build_directory="$ENGINE_ROOT/host-tests"
-	cmake -S "$SOURCE_DIR" -B "$build_directory" -G Ninja \
-		-DCMAKE_BUILD_TYPE=Debug \
-		-DOPTION_USE_PARENT_GIT=ON
-	cmake --build "$build_directory" --target openttd_test openttd regression_files --parallel
-	unzip -oqj "$REPO_ROOT/Data/opengfx-8.0-all.zip" '*.tar' -d "$build_directory/baseset"
-	ctest --test-dir "$build_directory" --output-on-failure
-}
-
-generate_project()
-{
-	require_tool xcodegen
-	require_artifacts
-	require_engine_artifact
-	prepare_data
-	mkdir -p "$DERIVED_DATA"
-	xcodegen --spec "$IOS_DIR/project.yml" --project "$IOS_DIR" \
-		--cache-path "$DERIVED_DATA/xcodegen-cache" --use-cache
-}
-
-is_uuid()
-{
-	[[ "$1" =~ ^[[:xdigit:]]{8}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{12}$ ]]
-}
-
-resolve_simulator()
-{
-	local selector="$1"
-	if is_uuid "$selector"; then
-		printf '%s\n' "$selector"
-		return
-	fi
-
-	local line
-	line="$(xcrun simctl list devices available | grep -F "    $selector (" | head -n 1 || true)"
-	[[ -n "$line" ]] || fail "available simulator not found: $selector"
-	printf '%s\n' "$line" | sed -E 's/.*\(([[:xdigit:]-]{36})\).*/\1/'
-}
-
-boot_simulator()
-{
-	local simulator="$1"
-	if ! xcrun simctl list devices | grep -F "$simulator" | grep -q '(Booted)'; then
-		xcrun simctl boot "$simulator"
-	fi
-	xcrun simctl bootstatus "$simulator" -b
-}
-
-destination_for()
-{
-	local platform="$1"
-	local selector="${2:-}"
-	case "$platform" in
-		simulator)
-			if [[ -z "$selector" ]]; then
-				echo 'generic/platform=iOS Simulator'
+	case "${1:-}" in
+		"")
+			if [[ -n "$SIMULATOR_OPTION" && -n "$DEVICE_OPTION" ]]; then
+				PLATFORMS="simulator device"
+			elif [[ -n "$DEVICE_OPTION" ]]; then
+				PLATFORMS=device
 			else
-				echo "platform=iOS Simulator,id=$(resolve_simulator "$selector")"
+				PLATFORMS=simulator
 			fi
+			;;
+		simulator)
+			[[ -z "$DEVICE_OPTION" ]] || usage_error "--device contradicts target simulator"
+			PLATFORMS=simulator
 			;;
 		device)
-			if [[ -z "$selector" ]]; then
-				echo 'generic/platform=iOS'
-			elif is_uuid "$selector"; then
-				echo "platform=iOS,id=$selector"
-			else
-				echo "platform=iOS,name=$selector"
-			fi
+			[[ -z "$SIMULATOR_OPTION" ]] || usage_error "--simulator contradicts target device"
+			PLATFORMS=device
 			;;
-		*) fail "platform must be simulator or device" ;;
+		both) PLATFORMS="simulator device" ;;
+		*) usage_error "unknown target: $1" ;;
+	esac
+	SIMULATOR="${SIMULATOR_OPTION:-$DEFAULT_SIMULATOR}"
+	DEVICE="${DEVICE_OPTION:-$DEFAULT_DEVICE}"
+}
+
+# Platforms and SDKs ----------------------------------------------------------
+
+target_word()
+{
+	case "$*" in
+		simulator|iphonesimulator) echo simulator ;;
+		device|iphoneos) echo device ;;
+		*) echo both ;;
 	esac
 }
 
-build_app()
+platforms_for()
 {
-	local platform="$1"
-	local selector="${2:-}"
-	local signing="${3:-signed}"
-	build_engine all
-	generate_project
-	local arguments=(
-		-project "$PROJECT"
-		-scheme "$SCHEME"
-		-configuration Debug
-		-destination "$(destination_for "$platform" "$selector")"
-		-derivedDataPath "$DERIVED_DATA"
-		-allowProvisioningUpdates
-		build
-	)
-	if [[ "$platform" == simulator ]]; then
-		arguments+=(CODE_SIGNING_ALLOWED=NO)
-	elif [[ "$signing" == unsigned ]]; then
-		arguments+=(CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO)
-	fi
-	xcodebuild "${arguments[@]}"
-	verify_bundled_data "$platform"
+	case "$1" in
+		simulator|device) echo "$1" ;;
+		both) echo simulator device ;;
+		*) return 1 ;;
+	esac
+}
+
+sdk_for()
+{
+	case "$1" in
+		simulator) echo iphonesimulator ;;
+		device) echo iphoneos ;;
+	esac
+}
+
+slice_id()
+{
+	case "$1" in
+		iphoneos) echo ios-arm64 ;;
+		iphonesimulator) echo ios-arm64-simulator ;;
+	esac
+}
+
+has_slice()
+{
+	[[ -f "$1/Info.plist" ]] || return 1
+	plutil -extract AvailableLibraries xml1 -o - "$1/Info.plist" | grep -Fq "<string>$(slice_id "$2")</string>"
 }
 
 app_path()
@@ -294,88 +223,183 @@ app_path()
 	case "$1" in
 		simulator) echo "$DERIVED_DATA/Build/Products/Debug-iphonesimulator/OpenTTD.app" ;;
 		device) echo "$DERIVED_DATA/Build/Products/Debug-iphoneos/OpenTTD.app" ;;
-		*) fail "platform must be simulator or device" ;;
 	esac
 }
 
-verify_bundled_data()
-{
-	local app
-	app="$(app_path "$1")"
-	[[ -d "$app/SeedData" ]] || fail "built app is missing bundled SeedData"
-	[[ ! -e "$app/SeedData/OpenTTD" ]] || fail "bundled SeedData contains the forbidden OpenTTD wrapper"
-	[[ -f "$app/SeedData/baseset/opengfx-8.0.tar" ]] || fail "built app is missing bundled OpenGFX"
-	[[ -f "$app/SeedData/baseset/opensfx-1.0.3.tar" ]] || fail "built app is missing bundled OpenSFX"
-	[[ -f "$app/SeedData/baseset/openmsx-0.4.2/openmsx.obm" ]] || fail "built app is missing bundled OpenMSX"
-	[[ -f "$app/SeedData/baseset/timgm6mb/TimGM6mb.sf2" ]] || fail "built app is missing bundled TimGM6mb"
-	[[ -f "$app/SeedData/baseset/timgm6mb/LICENSE.txt" ]] || fail "built app is missing the TimGM6mb copyright notice"
-	[[ -f "$app/SeedData/baseset/timgm6mb/COPYING.md" ]] || fail "built app is missing the TimGM6mb GPL-2 license"
-}
+# Build ------------------------------------------------------------------------
 
-install_app()
+BUILD_NUMBER=""
+
+# One number per invocation, shared by every app build it performs.
+next_build_number()
 {
-	local platform="$1"
-	local selector="${2:-}"
-	local app
-	if [[ "$platform" == device ]]; then
-		build_app device
-	else
-		build_app "$platform" "$selector"
+	[[ -z "$BUILD_NUMBER" ]] || return 0
+	local previous=0
+	if [[ -f "$BUILD_NUMBER_FILE" ]]; then
+		previous="$(<"$BUILD_NUMBER_FILE")"
+		[[ "$previous" =~ ^[0-9]+$ ]] || fail "$BUILD_NUMBER_FILE does not hold a build number"
 	fi
-	app="$(app_path "$platform")"
-	case "$platform" in
-		simulator)
-			local simulator
-			simulator="$(resolve_simulator "${selector:-$DEFAULT_SIMULATOR}")"
-			boot_simulator "$simulator"
-			xcrun simctl install "$simulator" "$app"
-			;;
-		device)
-			xcrun devicectl device install app --device "${selector:-$DEFAULT_DEVICE}" "$app"
-			;;
-		*) fail "platform must be simulator or device" ;;
-	esac
+	BUILD_NUMBER=$((10#$previous + 1))
+	printf '%s\n' "$BUILD_NUMBER" > "$BUILD_NUMBER_FILE"
 }
 
-run_app()
+# Builds only XCFrameworks or slices that are missing; existing artifacts are reused.
+ensure_deps()
 {
-	local platform="$1"
-	local selector="${2:-}"
-	install_app "$platform" "$selector"
-	case "$platform" in
-		simulator)
-			local simulator
-			simulator="$(resolve_simulator "${selector:-$DEFAULT_SIMULATOR}")"
-			xcrun simctl launch --terminate-running-process "$simulator" "$BUNDLE_ID"
-			;;
-		device)
-			xcrun devicectl device process launch --terminate-existing \
-				--device "${selector:-$DEFAULT_DEVICE}" "$BUNDLE_ID"
-			;;
-		*) fail "platform must be simulator or device" ;;
-	esac
+	local entry framework sdk
+	for entry in sdl3:SDL3 zlib:Zlib xz:LibLZMA libpng:LibPNG lzo:LZO; do
+		framework="$DEPS_ARTIFACTS/${entry#*:}.xcframework"
+		local missing=()
+		for sdk in "$@"; do
+			has_slice "$framework" "$sdk" || missing+=("$sdk")
+		done
+		if [[ ${#missing[@]} -gt 0 ]]; then
+			"$DEPS_SCRIPT" build "${entry%%:*}" "$(target_word "${missing[@]}")"
+		fi
+	done
+	local soundfont="$DEPS_ARTIFACTS/TimGM6mb"
+	if [[ ! -f "$soundfont/TimGM6mb.sf2" || ! -f "$soundfont/LICENSE.txt" || ! -f "$soundfont/COPYING.md" ]]; then
+		"$DEPS_SCRIPT" build timgm6mb
+	fi
 }
 
+host_arguments()
+{
+	printf '%s\n' -DCMAKE_BUILD_TYPE=Release -DOPTION_TOOLS_ONLY=ON
+}
+
+engine_arguments()
+{
+	local sdk="$1"
+	local slice
+	slice="$(slice_id "$sdk")"
+	printf '%s\n' \
+		-DCMAKE_SYSTEM_NAME=iOS \
+		-DCMAKE_OSX_SYSROOT="$(xcrun --sdk "$sdk" --show-sdk-path)" \
+		-DCMAKE_OSX_ARCHITECTURES=arm64 \
+		-DCMAKE_OSX_DEPLOYMENT_TARGET="$IOS_MIN_VERSION" \
+		-DCMAKE_CXX_COMPILER="$(xcrun --find clang++)" \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+		-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
+		-DHOST_BINARY_DIR="$(cmake_tree host)" \
+		-DOPTION_USE_PARENT_GIT=ON \
+		-DSDL3_INCLUDE_DIR="$DEPS_ARTIFACTS/SDL3.xcframework/$slice/Headers" \
+		-DZLIB_INCLUDE_DIR="$DEPS_ARTIFACTS/Zlib.xcframework/$slice/Headers" \
+		-DZLIB_LIBRARY="$DEPS_ARTIFACTS/Zlib.xcframework/$slice/libz.a" \
+		-DLIBLZMA_INCLUDE_DIR="$DEPS_ARTIFACTS/LibLZMA.xcframework/$slice/Headers" \
+		-DLIBLZMA_LIBRARY="$DEPS_ARTIFACTS/LibLZMA.xcframework/$slice/liblzma.a" \
+		-DPNG_PNG_INCLUDE_DIR="$DEPS_ARTIFACTS/LibPNG.xcframework/$slice/Headers" \
+		-DPNG_LIBRARY="$DEPS_ARTIFACTS/LibPNG.xcframework/$slice/libpng16.a" \
+		-DLZO_INCLUDE_DIR="$DEPS_ARTIFACTS/LZO.xcframework/$slice/Headers" \
+		-DLZO_LIBRARY="$DEPS_ARTIFACTS/LZO.xcframework/$slice/liblzo2.a"
+}
+
+cmake_arguments()
+{
+	if [[ "$1" == host ]]; then
+		host_arguments
+	else
+		engine_arguments "$1"
+	fi
+}
+
+# CMake trees are keyed by their complete configuration (SDK, compiler, dependency
+# slices, cache contract), so a changed configuration gets a fresh tree instead of
+# reconfiguring or deleting an existing one. Source edits stay incremental.
+# ponytail: superseded trees stay on disk until `clean`; prune by key if space matters.
+cmake_tree()
+{
+	local key
+	key="$( { printf '%s\n' "$ENGINE_CONFIG_TAG" "$(command -v c++)"; cmake_arguments "$1"; } | shasum -a 256 | cut -c1-12)"
+	printf '%s/%s-%s\n' "$ENGINE_ROOT" "$1" "$key"
+}
+
+# Configures the tree once, then builds <target> incrementally.
+build_tree()
+{
+	local name="$1"
+	local target="$2"
+	local tree
+	tree="$(cmake_tree "$name")"
+	if [[ ! -f "$tree/build.ninja" ]]; then
+		local arguments=()
+		local argument
+		while IFS= read -r argument; do
+			arguments+=("$argument")
+		done < <(cmake_arguments "$name")
+		cmake -S "$SOURCE_DIR" -B "$tree" -G Ninja "${arguments[@]}"
+	fi
+	cmake --build "$tree" --target "$target" --parallel
+}
+
+# Native strgen/settingsgen first, then the arm64 engine archive for <sdk>.
+build_engine_slice()
+{
+	local sdk="$1"
+	build_tree host tools
+	build_tree "$sdk" openttd_lib
+	local archive
+	archive="$(cmake_tree "$sdk")/libopenttd_engine.a"
+	[[ -f "$archive" ]] || fail "$sdk engine archive was not produced"
+	lipo -info "$archive" | grep -q 'arm64' || fail "$sdk engine archive is not arm64"
+}
+
+# Packages every current engine slice with the public bridge header; unchanged
+# packages are kept so Xcode does not relink.
+package_engine()
+{
+	local arguments=()
+	local archives=""
+	local current=yes
+	local sdk archive
+	for sdk in iphoneos iphonesimulator; do
+		archive="$(cmake_tree "$sdk")/libopenttd_engine.a"
+		[[ -f "$archive" ]] || continue
+		arguments+=(-library "$archive" -headers "$SOURCE_DIR/src/os/ios")
+		archives="$archives $archive"
+		if [[ "$archive" -nt "$ENGINE_XCFRAMEWORK/Info.plist" ]]; then
+			current=no
+		fi
+	done
+	local stamp="$ENGINE_ROOT/OpenTTDEngine.stamp"
+	if [[ "$current" == yes && -f "$stamp" && "$(<"$stamp")" == "$archives" ]]; then
+		echo "Using packaged OpenTTD engine"
+		return
+	fi
+
+	local staging="$ENGINE_ROOT/OpenTTDEngine.staging.xcframework"
+	rm -rf "$staging"
+	xcodebuild -create-xcframework "${arguments[@]}" -output "$staging"
+	rm -rf "$ENGINE_XCFRAMEWORK"
+	mv "$staging" "$ENGINE_XCFRAMEWORK"
+	printf '%s\n' "$archives" > "$stamp"
+	plutil -lint "$ENGINE_XCFRAMEWORK/Info.plist" >/dev/null
+	echo "Created $ENGINE_XCFRAMEWORK"
+}
+
+# Stages the Documents payload (bundled as SeedData): pinned base sets as released,
+# expanded OpenMSX, TimGM6mb with its licenses, generated languages, built-in media
+# and AI/GS compatibility scripts. Content-addressed; never a Documents/OpenTTD wrapper.
 prepare_data()
 {
-	require_tool unzip
-	require_tool shasum
-	[[ -d "$ENGINE_ROOT/iphoneos/lang" ]] || fail "missing generated languages; run ios/build.sh engine all"
+	local language_dir
+	language_dir="$(cmake_tree "$1")/lang"
+	[[ -d "$language_dir" ]] || fail "missing generated languages in $language_dir"
 
-	local language_dir="$ENGINE_ROOT/iphoneos/lang"
 	local fingerprint
 	fingerprint="documents-root-v1:$(shasum -a 256 \
 		"$REPO_ROOT"/Data/*.zip \
-		"$REPO_ROOT"/ios-deps/artifacts/TimGM6mb/TimGM6mb.sf2 \
-		"$REPO_ROOT"/ios-deps/artifacts/TimGM6mb/LICENSE.txt \
-		"$REPO_ROOT"/ios-deps/artifacts/TimGM6mb/COPYING.md \
+		"$DEPS_ARTIFACTS/TimGM6mb/TimGM6mb.sf2" \
+		"$DEPS_ARTIFACTS/TimGM6mb/LICENSE.txt" \
+		"$DEPS_ARTIFACTS/TimGM6mb/COPYING.md" \
 		"$SOURCE_DIR/media/baseset/openttd.grf" \
 		"$SOURCE_DIR/media/baseset/opntitle.dat" \
 		"$SOURCE_DIR/media/baseset/orig_extra.grf" \
 		"$SOURCE_DIR/media/baseset"/*.ttf \
 		"$SOURCE_DIR/bin/ai"/*.nut \
 		"$SOURCE_DIR/bin/game"/*.nut \
-		"$language_dir"/*.lng | shasum -a 256 | awk '{print $1}')"
+		"$language_dir"/*.lng | sed -E 's#  .*/#  #' | shasum -a 256 | awk '{print $1}')"
 	local stamp="$DATA_STAGE/data.stamp"
 	if [[ -f "$stamp" && "$(<"$stamp")" == "$fingerprint" ]]; then
 		echo "Using staged seed data"
@@ -386,7 +410,6 @@ prepare_data()
 	temporary="$(mktemp -d "$DERIVED_DATA/DataPackage.XXXXXX")"
 	local seed="$temporary/SeedData"
 	mkdir -p \
-		"$seed/baseset" \
 		"$seed/baseset/timgm6mb" \
 		"$seed/lang" \
 		"$seed/ai/library" \
@@ -396,16 +419,13 @@ prepare_data()
 		"$seed/newgrf" \
 		"$seed/screenshot" \
 		"$seed/content_download"
-	unzip -p "$REPO_ROOT/Data/opengfx-8.0-all.zip" '*.tar' > \
-		"$seed/baseset/opengfx-8.0.tar"
-	unzip -p "$REPO_ROOT/Data/opensfx-1.0.3-all.zip" '*.tar' > \
-		"$seed/baseset/opensfx-1.0.3.tar"
-	unzip -p "$REPO_ROOT/Data/openmsx-0.4.2-all.zip" '*.tar' | \
-		tar -xf - -C "$seed/baseset"
+	unzip -p "$REPO_ROOT/Data/opengfx-8.0-all.zip" '*.tar' > "$seed/baseset/opengfx-8.0.tar"
+	unzip -p "$REPO_ROOT/Data/opensfx-1.0.3-all.zip" '*.tar' > "$seed/baseset/opensfx-1.0.3.tar"
+	unzip -p "$REPO_ROOT/Data/openmsx-0.4.2-all.zip" '*.tar' | tar -xf - -C "$seed/baseset"
 	cp \
-		"$REPO_ROOT/ios-deps/artifacts/TimGM6mb/TimGM6mb.sf2" \
-		"$REPO_ROOT/ios-deps/artifacts/TimGM6mb/LICENSE.txt" \
-		"$REPO_ROOT/ios-deps/artifacts/TimGM6mb/COPYING.md" \
+		"$DEPS_ARTIFACTS/TimGM6mb/TimGM6mb.sf2" \
+		"$DEPS_ARTIFACTS/TimGM6mb/LICENSE.txt" \
+		"$DEPS_ARTIFACTS/TimGM6mb/COPYING.md" \
 		"$seed/baseset/timgm6mb/"
 	cp \
 		"$SOURCE_DIR/media/baseset/openttd.grf" \
@@ -422,12 +442,302 @@ prepare_data()
 	echo "Staged $SEED_DATA"
 }
 
-create_data_zip()
+generate_project()
 {
-	require_tool ditto
-	require_tool zip
-	prepare_data
-	local output="$DERIVED_DATA/OpenTTD-Documents.zip"
+	xcodegen --spec "$IOS_DIR/project.yml" --project "$IOS_DIR" \
+		--cache-path "$DERIVED_DATA/xcodegen-cache" --use-cache
+}
+
+verify_bundled_data()
+{
+	local app
+	app="$(app_path "$1")"
+	[[ -d "$app/SeedData" ]] || fail "built app is missing bundled SeedData"
+	[[ ! -e "$app/SeedData/OpenTTD" ]] || fail "bundled SeedData contains the forbidden OpenTTD wrapper"
+	[[ -f "$app/SeedData/baseset/opengfx-8.0.tar" ]] || fail "built app is missing bundled OpenGFX"
+	[[ -f "$app/SeedData/baseset/opensfx-1.0.3.tar" ]] || fail "built app is missing bundled OpenSFX"
+	[[ -f "$app/SeedData/baseset/openmsx-0.4.2/openmsx.obm" ]] || fail "built app is missing bundled OpenMSX"
+	[[ -f "$app/SeedData/baseset/timgm6mb/TimGM6mb.sf2" ]] || fail "built app is missing bundled TimGM6mb"
+	[[ -f "$app/SeedData/baseset/timgm6mb/LICENSE.txt" ]] || fail "built app is missing the TimGM6mb copyright notice"
+	[[ -f "$app/SeedData/baseset/timgm6mb/COPYING.md" ]] || fail "built app is missing the TimGM6mb GPL-2 license"
+}
+
+# Generic destinations: compilation never waits for a particular simulator or device.
+xcode_build()
+{
+	local platform="$1"
+	local signing="$2"
+	local arguments=(
+		-project "$PROJECT"
+		-scheme "$SCHEME"
+		-configuration Debug
+		-derivedDataPath "$DERIVED_DATA"
+		-allowProvisioningUpdates
+	)
+	if [[ "$platform" == simulator ]]; then
+		arguments+=(-destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO)
+	else
+		arguments+=(-destination 'generic/platform=iOS')
+		if [[ "$signing" == unsigned ]]; then
+			arguments+=(CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO)
+		fi
+	fi
+	xcodebuild "${arguments[@]}" "CURRENT_PROJECT_VERSION=$BUILD_NUMBER" build
+	verify_bundled_data "$platform"
+}
+
+# build_app <simulator|device|both> [signed|unsigned]
+build_app()
+{
+	local target="$1"
+	local signing="${2:-signed}"
+	local platforms platform
+	platforms="$(platforms_for "$target")"
+	require_tool cmake ninja lipo plutil shasum tar unzip xcodegen xcodebuild
+	next_build_number
+	echo "== OpenTTD build $BUILD_NUMBER ($target)"
+	mkdir -p "$DERIVED_DATA"
+
+	local sdks=()
+	for platform in $platforms; do
+		sdks+=("$(sdk_for "$platform")")
+	done
+	ensure_deps "${sdks[@]}"
+	local sdk
+	for sdk in "${sdks[@]}"; do
+		build_engine_slice "$sdk"
+	done
+	package_engine
+	prepare_data "${sdks[0]}"
+	generate_project
+	for platform in $platforms; do
+		xcode_build "$platform" "$signing"
+	done
+	echo "Built OpenTTD $BUILD_NUMBER ($target)"
+}
+
+# Simulators and devices ------------------------------------------------------
+
+is_uuid()
+{
+	[[ "$1" =~ ^[[:xdigit:]]{8}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{4}-[[:xdigit:]]{12}$ ]]
+}
+
+resolve_simulator()
+{
+	if is_uuid "$1"; then
+		printf '%s\n' "$1"
+		return
+	fi
+	local line
+	line="$(xcrun simctl list devices available | grep -F "    $1 (" | head -n 1 || true)"
+	[[ -n "$line" ]] || fail "available simulator not found: $1"
+	printf '%s\n' "$line" | sed -E 's/.*\(([[:xdigit:]-]{36})\).*/\1/'
+}
+
+boot_simulator()
+{
+	if ! xcrun simctl list devices | grep -F "$1" | grep -q '(Booted)'; then
+		xcrun simctl boot "$1"
+	fi
+	xcrun simctl bootstatus "$1" -b >/dev/null
+}
+
+device_has_app()
+{
+	local json
+	json="$(mktemp -t openttd-apps)"
+	local found=no
+	if xcrun devicectl device info apps --device "$DEVICE" --json-output "$json" >/dev/null 2>&1 && \
+		grep -Fq "\"$BUNDLE_ID\"" "$json"; then
+		found=yes
+	fi
+	rm -f "$json"
+	[[ "$found" == yes ]]
+}
+
+device_app_pid()
+{
+	local json
+	json="$(mktemp -t openttd-processes)"
+	if xcrun devicectl device info processes --device "$DEVICE" \
+		--search "/OpenTTD.app/OpenTTD" --json-output "$json" >/dev/null 2>&1; then
+		plutil -extract result.runningProcesses.0.processIdentifier raw -o - "$json" 2>/dev/null || true
+	fi
+	rm -f "$json"
+}
+
+install_platform()
+{
+	local app
+	app="$(app_path "$1")"
+	[[ -d "$app" ]] || fail "no $1 build to install; run: $(script_name) build $1"
+	case "$1" in
+		simulator)
+			local simulator
+			simulator="$(resolve_simulator "$SIMULATOR")"
+			boot_simulator "$simulator"
+			xcrun simctl install "$simulator" "$app"
+			echo "Installed on $SIMULATOR"
+			;;
+		device)
+			xcrun devicectl device install app --device "$DEVICE" "$app"
+			;;
+	esac
+}
+
+install_app()
+{
+	[[ "$NO_BUILD" == yes ]] || build_app "$(target_word $PLATFORMS)"
+	local platform
+	for platform in $PLATFORMS; do
+		install_platform "$platform"
+	done
+}
+
+# Run ---------------------------------------------------------------------------
+
+# Waits <seconds> while <pid> stays alive; fails as soon as it exits.
+hold()
+{
+	local remaining="$1"
+	while (( remaining > 0 )); do
+		kill -0 "$2" 2>/dev/null || return 1
+		sleep 1
+		remaining=$((remaining - 1))
+	done
+	kill -0 "$2" 2>/dev/null
+}
+
+# Ends the local console helper; CoreDevice consoles can ignore SIGINT.
+stop_console()
+{
+	local waited=0
+	while kill -0 "$1" 2>/dev/null && (( waited < 10 )); do
+		sleep 1
+		waited=$((waited + 1))
+	done
+	kill -KILL "$1" 2>/dev/null || true
+	wait "$1" 2>/dev/null || true
+}
+
+# Portrait captures are rotated 90° left so evidence is always landscape.
+landscape()
+{
+	local width height
+	width="$(sips -g pixelWidth "$1" | awk '/pixelWidth/ {print $2}')"
+	height="$(sips -g pixelHeight "$1" | awk '/pixelHeight/ {print $2}')"
+	if (( width < height )); then
+		sips --rotate -90 "$1" >/dev/null
+	fi
+}
+
+run_simulator()
+{
+	local seconds="$1"
+	local label="$2"
+	local simulator
+	simulator="$(resolve_simulator "$SIMULATOR")"
+	boot_simulator "$simulator"
+	if [[ "$NO_INSTALL" == yes ]]; then
+		xcrun simctl get_app_container "$simulator" "$BUNDLE_ID" >/dev/null 2>&1 || \
+			fail "OpenTTD is not installed on $SIMULATOR"
+	fi
+
+	local started=$SECONDS
+	xcrun simctl launch --terminate-running-process --console "$simulator" "$BUNDLE_ID" \
+		${APP_ARGS[@]+"${APP_ARGS[@]}"} > "$LOG_DIR/debugger.log" 2>&1 &
+	local console_pid=$!
+	local alive=yes
+	hold "$seconds" "$console_pid" || alive=no
+
+	if xcrun simctl io "$simulator" screenshot "$LOG_DIR/$label.png" >/dev/null 2>&1; then
+		landscape "$LOG_DIR/$label.png"
+	else
+		echo "warning: simulator screenshot failed" >&2
+	fi
+	xcrun simctl spawn "$simulator" log show --last "$((SECONDS - started + 5))s" --style compact \
+		--predicate 'process == "OpenTTD"' > "$LOG_DIR/$label.log" 2>&1 || \
+		echo "warning: simulator log collection failed" >&2
+	xcrun simctl terminate "$simulator" "$BUNDLE_ID" >/dev/null 2>&1 || true
+	stop_console "$console_pid"
+	[[ "$alive" == yes ]] || fail "OpenTTD exited before $seconds s; see log/debugger.log and log/$label.log"
+	echo "Ran OpenTTD on $SIMULATOR for $seconds s: log/debugger.log, log/$label.log, log/$label.png"
+}
+
+run_device()
+{
+	local seconds="$1"
+	local label="$2"
+	if [[ "$NO_INSTALL" == yes ]]; then
+		device_has_app || fail "OpenTTD is not installed on $DEVICE"
+	fi
+
+	# --terminate-existing replaces a running instance: the new process has a new PID.
+	local previous_pid pid=""
+	previous_pid="$(device_app_pid)"
+	xcrun devicectl device process launch --terminate-existing --console --timeout "$((seconds + 120))" \
+		--device "$DEVICE" "$BUNDLE_ID" ${APP_ARGS[@]+"${APP_ARGS[@]}"} > "$LOG_DIR/debugger.log" 2>&1 &
+	local console_pid=$!
+	local waited=0
+	while [[ -z "$pid" || "$pid" == "$previous_pid" ]]; do
+		if ! kill -0 "$console_pid" 2>/dev/null || (( waited >= 90 )); then
+			stop_console "$console_pid"
+			fail "OpenTTD did not launch on $DEVICE; see log/debugger.log"
+		fi
+		sleep 1
+		waited=$((waited + 1))
+		pid="$(device_app_pid)"
+	done
+	local alive=yes
+	hold "$seconds" "$console_pid" || alive=no
+
+	if xcrun devicectl device capture screenshot --device "$DEVICE" \
+		--destination "$LOG_DIR/$label.png" >/dev/null 2>&1; then
+		landscape "$LOG_DIR/$label.png"
+	else
+		echo "warning: device screenshot failed" >&2
+	fi
+	if [[ -n "$pid" ]]; then
+		xcrun devicectl device process terminate --device "$DEVICE" --pid "$pid" >/dev/null 2>&1 || true
+	fi
+	stop_console "$console_pid"
+	[[ "$alive" == yes ]] || fail "OpenTTD exited before $seconds s; see log/debugger.log"
+	echo "Ran OpenTTD on $DEVICE for $seconds s: log/debugger.log, log/$label.png"
+}
+
+run_app()
+{
+	[[ "$PLATFORMS" == simulator || "$PLATFORMS" == device ]] || usage_error "run takes a single target"
+	[[ "$RUN_SECONDS" =~ ^[0-9]+$ ]] && (( 10#$RUN_SECONDS >= 1 && 10#$RUN_SECONDS <= 45 )) || \
+		usage_error "--seconds must be 1-45"
+	RUN_SECONDS=$((10#$RUN_SECONDS))
+	local label="${LABEL:-$PLATFORMS}"
+	[[ "$label" =~ ^[A-Za-z0-9._-]+$ ]] || usage_error "--label may only contain letters, digits, '.', '_' and '-'"
+	[[ "$NO_INSTALL" == yes ]] || install_app
+	require_tool sips
+	mkdir -p "$LOG_DIR"
+	"run_$PLATFORMS" "$RUN_SECONDS" "$label"
+}
+
+# Documents payload ---------------------------------------------------------------
+
+# The payload needs generated languages: the simulator engine slice is built as needed.
+ensure_payload()
+{
+	require_tool cmake ninja lipo plutil shasum tar unzip
+	mkdir -p "$DERIVED_DATA"
+	ensure_deps iphonesimulator
+	build_engine_slice iphonesimulator
+	prepare_data iphonesimulator
+}
+
+documents_zip()
+{
+	require_tool ditto zip
+	ensure_payload
+	mkdir -p "$IPA_DIR"
+	local output="$IPA_DIR/Documents.zip"
 	local temporary
 	temporary="$(mktemp -d "$DERIVED_DATA/DocumentsZip.XXXXXX")"
 	ditto "$SEED_DATA" "$temporary/Documents"
@@ -446,306 +756,147 @@ create_data_zip()
 	echo "Created $output"
 }
 
-verify_data()
+# Existing Documents files are kept on the simulator; CoreDevice merges directories.
+documents_install()
 {
-	require_tool cmake
-	require_tool ditto
-	require_tool grep
-	require_tool ninja
-	prepare_data
-	[[ ! -e "$SEED_DATA/OpenTTD" ]] || fail "staged data contains a forbidden OpenTTD wrapper directory"
-	[[ -d "$SEED_DATA/save/autosave" ]] || fail "staged data is missing save/autosave"
-	[[ -d "$SEED_DATA/scenario/heightmap" ]] || fail "staged data is missing scenario/heightmap"
-	[[ "$(shasum -a 256 "$SEED_DATA/baseset/timgm6mb/TimGM6mb.sf2" | awk '{print $1}')" == \
-		"c5378b62028c920cb11e4803327983fee2f2cdff5dc89c708e39da417e51c854" ]] || fail "staged TimGM6mb checksum mismatch"
-
-	local build_directory="$ENGINE_ROOT/host-tests"
-	cmake -S "$SOURCE_DIR" -B "$build_directory" -G Ninja \
-		-DCMAKE_BUILD_TYPE=Debug \
-		-DOPTION_USE_PARENT_GIT=ON
-	cmake --build "$build_directory" --target openttd --parallel
-	mkdir -p "$LOG_DIR"
-	local temporary validation_root
-	temporary="$(mktemp -d "$DERIVED_DATA/DataValidation.XXXXXX")"
-	validation_root="$temporary/Documents"
-	ditto "$SEED_DATA" "$validation_root"
-	"$build_directory/openttd" -X -x -c "$validation_root/openttd.cfg" -d misc=1 -h \
-		> "$LOG_DIR/data-discovery.log" 2>&1
-	grep -Fq 'OpenGFX' "$LOG_DIR/data-discovery.log" || fail "OpenGFX was not discovered"
-	grep -Fq 'OpenSFX' "$LOG_DIR/data-discovery.log" || fail "OpenSFX was not discovered"
-	grep -Fq 'OpenMSX' "$LOG_DIR/data-discovery.log" || fail "OpenMSX was not discovered"
-	grep -Fq "$validation_root" "$LOG_DIR/data-discovery.log" || fail "staged Documents root was not searched"
-	rm -rf "$temporary"
-	echo "Staged data discovery passed; details are in $LOG_DIR/data-discovery.log"
-}
-
-push_data()
-{
-	local platform="$1"
-	local selector="${2:-}"
-	prepare_data
-	case "$platform" in
-		simulator)
-			require_tool rsync
-			local simulator container
-			simulator="$(resolve_simulator "${selector:-$DEFAULT_SIMULATOR}")"
-			container="$(xcrun simctl get_app_container "$simulator" "$BUNDLE_ID" data)"
-			mkdir -p "$container/Documents"
-			rsync -a --ignore-existing "$SEED_DATA/" "$container/Documents/"
-			;;
-		device)
-			local item
-			for item in "$SEED_DATA"/*; do
-				xcrun devicectl device copy to --device "${selector:-$DEFAULT_DEVICE}" \
-					--source "$item" \
-					--destination Documents \
-					--domain-type appDataContainer \
-					--domain-identifier "$BUNDLE_ID"
-			done
-			;;
-		*) fail "platform must be simulator or device" ;;
-	esac
-}
-
-test_simulator()
-{
-	require_tool sips
-	local selector="${1:-$DEFAULT_SIMULATOR}"
-	local seconds="${2:-45}"
-	[[ "$seconds" =~ ^[0-9]+$ ]] || fail "test duration must be a whole number of seconds"
-	local simulator
-	simulator="$(resolve_simulator "$selector")"
-	install_app simulator "$simulator"
-	mkdir -p "$LOG_DIR"
-	xcrun simctl launch --terminate-running-process --console "$simulator" "$BUNDLE_ID" \
-		-s ios -S OpenSFX -M OpenMSX -d driver=1,misc=1 \
-		> "$LOG_DIR/debugger.log" 2>&1 &
-	local console_pid=$!
-	local launch_wait=0
-	while ! grep -Fq 'IOS_ENGINE START revision=' "$LOG_DIR/debugger.log"; do
-		if ! kill -0 "$console_pid" 2>/dev/null; then
-			wait "$console_pid" 2>/dev/null || true
-			fail "simulator app exited before the engine started"
-		fi
-		if (( launch_wait >= 30 )); then
-			kill -KILL "$console_pid" 2>/dev/null || true
-			wait "$console_pid" 2>/dev/null || true
-			fail "simulator engine did not start within 30 seconds"
-		fi
-		sleep 1
-		launch_wait=$((launch_wait + 1))
+	ensure_payload
+	local platform
+	for platform in $PLATFORMS; do
+		case "$platform" in
+			simulator)
+				require_tool rsync
+				local simulator container
+				simulator="$(resolve_simulator "$SIMULATOR")"
+				boot_simulator "$simulator"
+				container="$(xcrun simctl get_app_container "$simulator" "$BUNDLE_ID" data 2>/dev/null)" || \
+					fail "OpenTTD is not installed on $SIMULATOR"
+				mkdir -p "$container/Documents"
+				rsync -a --ignore-existing "$SEED_DATA/" "$container/Documents/"
+				echo "Installed the Documents payload on $SIMULATOR"
+				;;
+			device)
+				device_has_app || fail "OpenTTD is not installed on $DEVICE"
+				local item
+				for item in "$SEED_DATA"/*; do
+					xcrun devicectl device copy to --device "$DEVICE" \
+						--source "$item" \
+						--destination Documents \
+						--domain-type appDataContainer \
+						--domain-identifier "$BUNDLE_ID"
+				done
+				echo "Installed the Documents payload on $DEVICE"
+				;;
+		esac
 	done
-	if (( seconds >= 15 )); then
-		sleep 10
-		xcrun simctl launch "$simulator" com.apple.Preferences >/dev/null
-		sleep 3
-		xcrun simctl launch "$simulator" "$BUNDLE_ID" >/dev/null
-		sleep $((seconds - 13))
-	else
-		sleep "$seconds"
-	fi
-	xcrun simctl io "$simulator" screenshot "$LOG_DIR/skeleton.png"
-	xcrun simctl spawn "$simulator" log show --last 2m --style compact \
-		--predicate 'process == "OpenTTD"' > "$LOG_DIR/simulator.log"
-	xcrun simctl terminate "$simulator" "$BUNDLE_ID" || true
-	wait "$console_pid" || true
-
-	local width height
-	width="$(sips -g pixelWidth "$LOG_DIR/skeleton.png" | awk '/pixelWidth/ {print $2}')"
-	height="$(sips -g pixelHeight "$LOG_DIR/skeleton.png" | awk '/pixelHeight/ {print $2}')"
-	if (( width < height )); then
-		sips --rotate -90 "$LOG_DIR/skeleton.png" >/dev/null
-	fi
-	grep -Fq 'IOS_ENGINE START revision=' "$LOG_DIR/simulator.log" || \
-		fail "OpenTTD engine marker missing from simulator log"
-	grep -Fq 'IOS_ENGINE DATA root=' "$LOG_DIR/simulator.log" || \
-		fail "Documents data marker missing from simulator log"
-	if grep -F 'IOS_ENGINE DATA root=' "$LOG_DIR/simulator.log" | grep -Fq '/Documents/OpenTTD'; then
-		fail "simulator used the forbidden Documents/OpenTTD wrapper"
-	fi
-	grep -Fq 'IOS_VIDEO READY renderer=metal' "$LOG_DIR/simulator.log" || \
-		fail "Metal readiness marker missing from simulator log"
-	grep -Fq 'IOS_VIDEO PRESENT first_dirty=' "$LOG_DIR/simulator.log" || \
-		fail "OpenTTD framebuffer presentation marker missing from simulator log"
-	grep -Fq 'IOS_AUDIO READY rate=' "$LOG_DIR/simulator.log" || \
-		fail "SDL3 audio readiness marker missing from simulator log"
-	grep -F 'IOS_AUDIO READY rate=' "$LOG_DIR/simulator.log" | grep -Fq 'sound_set=OpenSFX' || \
-		fail "OpenSFX selection marker missing from simulator log"
-	grep -Fq 'IOS_AUDIO CALLBACK active=yes' "$LOG_DIR/simulator.log" || \
-		fail "SDL3 audio callback marker missing from simulator log"
-	grep -F 'IOS_MUSIC READY synth=midisynth' "$LOG_DIR/simulator.log" | grep -Fq 'music_set=OpenMSX' || \
-		fail "native MIDI/OpenMSX readiness marker missing from simulator log"
-	grep -Fq 'IOS_MUSIC PLAY ' "$LOG_DIR/simulator.log" || \
-		fail "native MIDI play marker missing from simulator log"
-	grep -Fq 'IOS_MUSIC PLAYBACK active=yes' "$LOG_DIR/simulator.log" || \
-		fail "native MIDI playback marker missing from simulator log"
-	if (( seconds >= 15 )); then
-		grep -Fq 'IOS_MUSIC LIFECYCLE background' "$LOG_DIR/simulator.log" || \
-			fail "native MIDI background marker missing from simulator log"
-		grep -Fq 'IOS_MUSIC LIFECYCLE foreground' "$LOG_DIR/simulator.log" || \
-			fail "native MIDI foreground marker missing from simulator log"
-	fi
-	local container
-	container="$(xcrun simctl get_app_container "$simulator" "$BUNDLE_ID" data)"
-	[[ ! -e "$container/Documents/OpenTTD" ]] || fail "simulator contains the forbidden Documents/OpenTTD wrapper"
-	[[ -f "$container/Documents/baseset/opengfx-8.0.tar" ]] || fail "OpenGFX was not seeded into Documents/baseset"
-	[[ -f "$container/Documents/baseset/opensfx-1.0.3.tar" ]] || fail "OpenSFX was not seeded into Documents/baseset"
-	[[ -f "$container/Documents/baseset/openmsx-0.4.2/openmsx.obm" ]] || fail "OpenMSX was not seeded into Documents/baseset"
-	[[ -f "$container/Documents/baseset/timgm6mb/TimGM6mb.sf2" ]] || fail "TimGM6mb was not seeded into Documents/baseset"
-	[[ -f "$container/Documents/baseset/timgm6mb/LICENSE.txt" ]] || fail "TimGM6mb copyright notice was not seeded"
-	[[ -f "$container/Documents/baseset/timgm6mb/COPYING.md" ]] || fail "TimGM6mb GPL-2 license was not seeded"
-	echo "Simulator engine test passed; logs and screenshot are in $LOG_DIR"
 }
 
-test_device()
-{
-	local selector="${1:-$DEFAULT_DEVICE}"
-	local seconds="${2:-45}"
-	[[ "$seconds" =~ ^[0-9]+$ ]] || fail "test duration must be a whole number of seconds"
-	install_app device "$selector"
-	mkdir -p "$LOG_DIR"
-	local console_timeout=$((seconds + 60))
-	xcrun devicectl device process launch --terminate-existing --console --timeout "$console_timeout" \
-		--device "$selector" "$BUNDLE_ID" -s ios -S OpenSFX -M OpenMSX -d driver=1,misc=1 \
-		> "$LOG_DIR/device-debugger.log" 2>&1 &
-	local console_pid=$!
-	local launch_wait=0
-	while ! grep -Fq 'IOS_ENGINE START revision=' "$LOG_DIR/device-debugger.log"; do
-		if ! kill -0 "$console_pid" 2>/dev/null; then
-			wait "$console_pid" 2>/dev/null || true
-			fail "device app exited before the engine started"
-		fi
-		if (( launch_wait >= 30 )); then
-			kill -KILL "$console_pid" 2>/dev/null || true
-			wait "$console_pid" 2>/dev/null || true
-			fail "device engine did not start within 30 seconds"
-		fi
-		sleep 1
-		launch_wait=$((launch_wait + 1))
-	done
+# Packaging ---------------------------------------------------------------------
 
-	local device_pid
-	device_pid="$(sed -nE '/OpenTTD\[[0-9]+:/ { s/.*OpenTTD\[([0-9]+):.*/\1/p; q; }' "$LOG_DIR/device-debugger.log")"
-	[[ -n "$device_pid" ]] || fail "could not determine the device process identifier"
-	sleep "$seconds"
-	if ! kill -0 "$console_pid" 2>/dev/null; then
-		wait "$console_pid" 2>/dev/null || true
-		fail "device app exited before the $seconds-second stability interval"
-	fi
-	xcrun devicectl device process terminate --device "$selector" --pid "$device_pid"
-	kill -KILL "$console_pid" 2>/dev/null || true
-	wait "$console_pid" 2>/dev/null || true
-	grep -Fq 'IOS_ENGINE START revision=' "$LOG_DIR/device-debugger.log" || \
-		fail "OpenTTD engine marker missing from device console"
-	grep -Fq 'IOS_ENGINE DATA root=' "$LOG_DIR/device-debugger.log" || \
-		fail "Documents data marker missing from device console"
-	if grep -F 'IOS_ENGINE DATA root=' "$LOG_DIR/device-debugger.log" | grep -Fq '/Documents/OpenTTD'; then
-		fail "device used the forbidden Documents/OpenTTD wrapper"
-	fi
-	grep -Fq 'IOS_VIDEO READY renderer=metal' "$LOG_DIR/device-debugger.log" || \
-		fail "Metal readiness marker missing from device console"
-	grep -Fq 'IOS_VIDEO PRESENT first_dirty=' "$LOG_DIR/device-debugger.log" || \
-		fail "OpenTTD framebuffer presentation marker missing from device console"
-	grep -Fq 'IOS_AUDIO READY rate=' "$LOG_DIR/device-debugger.log" || \
-		fail "SDL3 audio readiness marker missing from device console"
-	grep -F 'IOS_AUDIO READY rate=' "$LOG_DIR/device-debugger.log" | grep -Fq 'sound_set=OpenSFX' || \
-		fail "OpenSFX selection marker missing from device console"
-	grep -Fq 'IOS_AUDIO CALLBACK active=yes' "$LOG_DIR/device-debugger.log" || \
-		fail "SDL3 audio callback marker missing from device console"
-	grep -F 'IOS_MUSIC READY synth=midisynth' "$LOG_DIR/device-debugger.log" | grep -Fq 'music_set=OpenMSX' || \
-		fail "native MIDI/OpenMSX readiness marker missing from device console"
-	grep -Fq 'IOS_MUSIC PLAY ' "$LOG_DIR/device-debugger.log" || \
-		fail "native MIDI play marker missing from device console"
-	grep -Fq 'IOS_MUSIC PLAYBACK active=yes' "$LOG_DIR/device-debugger.log" || \
-		fail "native MIDI playback marker missing from device console"
-	echo "Device engine test passed for $seconds seconds after startup; console output is in $LOG_DIR/device-debugger.log"
-}
-
-archive_app()
-{
-	build_engine all
-	generate_project
-	xcodebuild -project "$PROJECT" -scheme "$SCHEME" -configuration Release \
-		-destination 'generic/platform=iOS' -derivedDataPath "$DERIVED_DATA" \
-		-archivePath "$DERIVED_DATA/OpenTTD.xcarchive" -allowProvisioningUpdates archive
-}
+IPA_PATH=""
+IPA_NAME=""
 
 create_ipa()
 {
-	require_tool ditto
-	require_tool zip
 	local signing="$1"
-	[[ "$signing" == signed || "$signing" == unsigned ]] || fail "IPA mode must be signed or unsigned"
-	build_app device "" "$signing"
+	require_tool ditto zip
+	build_app device "$signing"
 	local app
 	app="$(app_path device)"
+	local version build
+	version="$(plutil -extract CFBundleShortVersionString raw -o - "$app/Info.plist")"
+	build="$(plutil -extract CFBundleVersion raw -o - "$app/Info.plist")"
+	[[ "$build" == "$BUILD_NUMBER" ]] || fail "app reports build $build instead of $BUILD_NUMBER"
+
+	IPA_NAME="OpenTTD-$version-$build.ipa"
+	IPA_PATH="$IPA_DIR/OpenTTD.ipa"
+	[[ "$signing" == signed ]] || IPA_PATH="$IPA_DIR/OpenTTD-unsigned.ipa"
+	mkdir -p "$IPA_DIR"
 	local temporary
 	temporary="$(mktemp -d "$DERIVED_DATA/IPA.XXXXXX")"
 	mkdir -p "$temporary/Payload"
 	ditto "$app" "$temporary/Payload/OpenTTD.app"
-	local output="$DERIVED_DATA/OpenTTD-$signing.ipa"
-	rm -f "$output"
-	(cd "$temporary" && zip -qry "$output" Payload)
+	rm -f "$IPA_PATH"
+	(cd "$temporary" && zip -qry "$IPA_PATH" Payload)
 	rm -rf "$temporary"
-	echo "Created $output"
+	echo "Created $IPA_PATH ($IPA_NAME)"
 }
 
-require_tool xcodebuild
-require_tool xcrun
-mkdir -p "$DERIVED_DATA"
+push_ipa()
+{
+	require_tool curl
+	create_ipa signed
+	local archived="$ARCHIVE_DIR/$IPA_NAME"
+	[[ ! -e "$archived" ]] || fail "$archived already exists"
+	mkdir -p "$ARCHIVE_DIR"
+	cp "$IPA_PATH" "$archived"
+	curl --fail --silent --show-error -F "file=@$archived" "$REPO_SERVER_URL"
+	echo
+	echo "Pushed archive/$IPA_NAME"
+}
 
-command="${1:-}"
-case "$command" in
-	engine)
-		[[ $# -eq 2 ]] || { usage; exit 2; }
-		build_engine "$2"
+# Main ---------------------------------------------------------------------------
+
+COMMAND="${1:-}"
+case "$COMMAND" in
+	""|-h|--help)
+		usage
+		exit 0
 		;;
-	test-host)
-		[[ $# -eq 1 ]] || { usage; exit 2; }
-		test_host
+	build|install|run|ipa|push|documents|clean) shift ;;
+	*)
+		usage >&2
+		exit 1
 		;;
-	generate)
-		[[ $# -eq 1 ]] || { usage; exit 2; }
-		build_engine all
-		generate_project
+esac
+parse_arguments "$@"
+require_tool xcrun
+
+case "$COMMAND" in
+	build)
+		allow 1
+		platforms_for "${POSITIONAL[0]:-simulator}" >/dev/null || usage_error "unknown target: ${POSITIONAL[0]}"
+		build_app "${POSITIONAL[0]:-simulator}"
 		;;
-	build|install|run)
-		[[ $# -ge 2 && $# -le 3 ]] || { usage; exit 2; }
-		"${command//-/_}_app" "$2" "${3:-}"
+	install)
+		allow 1 --simulator --device --no-build
+		resolve_targets "${POSITIONAL[0]:-}"
+		install_app
 		;;
-	data-push)
-		[[ $# -ge 2 && $# -le 3 ]] || { usage; exit 2; }
-		build_engine all
-		push_data "$2" "${3:-}"
-		;;
-	test-simulator)
-		[[ $# -le 3 ]] || { usage; exit 2; }
-		test_simulator "${2:-}" "${3:-45}"
-		;;
-	test-device)
-		[[ $# -le 3 ]] || { usage; exit 2; }
-		test_device "${2:-}" "${3:-45}"
-		;;
-	data-zip)
-		[[ $# -eq 1 ]] || { usage; exit 2; }
-		build_engine all
-		create_data_zip
-		;;
-	data-verify)
-		[[ $# -eq 1 ]] || { usage; exit 2; }
-		build_engine all
-		verify_data
-		;;
-	archive)
-		[[ $# -eq 1 ]] || { usage; exit 2; }
-		archive_app
+	run)
+		allow 1 --simulator --device --seconds --label --no-build --no-install --
+		resolve_targets "${POSITIONAL[0]:-}"
+		[[ "$NO_INSTALL" == no ]] || NO_BUILD=yes
+		run_app
 		;;
 	ipa)
-		[[ $# -eq 2 ]] || { usage; exit 2; }
-		create_ipa "$2"
+		allow 0 --unsigned
+		if [[ "$UNSIGNED" == yes ]]; then
+			create_ipa unsigned
+		else
+			create_ipa signed
+		fi
 		;;
-	*)
-		usage
-		exit 2
+	push)
+		allow 0
+		push_ipa
+		;;
+	documents)
+		case "${POSITIONAL[0]:-}" in
+			zip)
+				allow 1
+				documents_zip
+				;;
+			install)
+				allow 2 --simulator --device
+				resolve_targets "${POSITIONAL[1]:-}"
+				documents_install
+				;;
+			*) usage_error "documents takes zip or install" ;;
+		esac
+		;;
+	clean)
+		allow 0
+		rm -rf "$DERIVED_DATA"
+		echo "Removed $DERIVED_DATA"
 		;;
 esac
