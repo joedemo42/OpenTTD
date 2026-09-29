@@ -76,7 +76,6 @@ add_custom_target(find_version
                 -DCPACK_BINARY_DIR=${CMAKE_BINARY_DIR}
                 -DREV_MAJOR=${PROJECT_VERSION_MAJOR}
                 -DREV_MINOR=${PROJECT_VERSION_MINOR}
-                -DUSE_PARENT_GIT=${OPTION_USE_PARENT_GIT}
                 -DWINDOWS=${WIN32}
                 -DDOXYGEN_WARN_FORMAT_LINE=${DOXYGEN_WARN_FORMAT_LINE}
                 -DDOXYGEN_WARN_FILE=${DOXYGEN_WARN_FILE}
