@@ -20,13 +20,13 @@ deps <command> [args]                        → ios-deps/build-deps.sh (same sy
   build      <all|dep> [simulator|device|both]  XCFrameworks → ios-deps/artifacts. Default: both
   clean      <all|dep>                        remove ios-deps/build/<dep> + artifacts
   dist-clean <all|dep>                        clean + remove ios-deps/source/<dep>
-build|install|run|ipa|push|documents         → ios/build.sh (same syntax)
+build|install|run|ipa|upload|documents       → ios/build.sh (same syntax)
   build      [simulator|device|both]          deps, engine, app; build number +1. Default: simulator
   install    [target] [--no-build]            build + install app only
   run        [target] [--seconds <1-45>] [--label <name>] [--no-build] [--no-install] [-- <app args>]
                                               build + install + run (45 s); logs + screenshot → log/
   ipa        [--unsigned]                     device build → IPA in DerivedData/ipa
-  push                                        signed IPA → archive/ → repo server
+  upload                                      signed IPA → archive/ → repo server
   documents  zip | install [target]           Documents payload → ZIP | installed app
 clean [app|deps|all]                         app: DerivedData, deps: every dependency. Default: app
 
@@ -44,7 +44,7 @@ case "${1:-}" in
 		shift
 		exec "$DEPS" "$@"
 		;;
-	build|install|run|ipa|push|documents)
+	build|install|run|ipa|upload|documents)
 		exec "$APP" "$@"
 		;;
 	clean)

@@ -51,7 +51,7 @@ run       [target] [--seconds <1-45>] [--label <name>] [--no-build] [--no-instal
           --no-build: use last build. --no-install: launch installed app (implies --no-build)
 ipa       [--unsigned]
           Device build → IPA in DerivedData/ipa. Default: signed
-push
+upload
           Signed IPA of the current tree → archive/ → repo server
 documents zip
           Documents payload → DerivedData/ipa/Documents.zip
@@ -820,7 +820,7 @@ create_ipa()
 	echo "Created $IPA_PATH ($IPA_NAME)"
 }
 
-push_ipa()
+upload_ipa()
 {
 	require_tool curl
 	create_ipa signed
@@ -830,7 +830,7 @@ push_ipa()
 	cp "$IPA_PATH" "$archived"
 	curl --fail --silent --show-error -F "file=@$archived" "$REPO_SERVER_URL"
 	echo
-	echo "Pushed archive/$IPA_NAME"
+	echo "Uploaded archive/$IPA_NAME"
 }
 
 # Main ---------------------------------------------------------------------------
@@ -841,7 +841,7 @@ case "$COMMAND" in
 		usage
 		exit 0
 		;;
-	build|install|run|ipa|push|documents|clean) shift ;;
+	build|install|run|ipa|upload|documents|clean) shift ;;
 	*)
 		usage >&2
 		exit 1
@@ -875,9 +875,9 @@ case "$COMMAND" in
 			create_ipa signed
 		fi
 		;;
-	push)
+	upload)
 		allow 0
-		push_ipa
+		upload_ipa
 		;;
 	documents)
 		case "${POSITIONAL[0]:-}" in
