@@ -26,7 +26,8 @@ build|install|run|ipa|upload|documents       → ios/build.sh (same syntax)
   run        [target] [--seconds <1-45>] [--label <name>] [--no-build] [--no-install] [-- <app args>]
                                               build + install + run (45 s); logs + screenshot → log/
   ipa        [--unsigned]                     device build → IPA in DerivedData/ipa
-  upload                                      signed IPA → archive/ → repo server
+  upload     [--notes <text>|--notes-file <path>]
+                                              signed IPA + release notes → archive/ → repo server
   documents  zip | install [target]           Documents payload → ZIP | installed app
 clean [app|deps|all]                         app: DerivedData, deps: every dependency. Default: app
 

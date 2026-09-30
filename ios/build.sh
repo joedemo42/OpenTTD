@@ -51,8 +51,8 @@ run       [target] [--seconds <1-45>] [--label <name>] [--no-build] [--no-instal
           --no-build: use last build. --no-install: launch installed app (implies --no-build)
 ipa       [--unsigned]
           Device build → IPA in DerivedData/ipa. Default: signed
-upload
-          Signed IPA of the current tree → archive/ → repo server
+upload    [--notes <text>|--notes-file <path>]
+          Signed IPA of the current tree → archive/ → repo server, with release notes ("What's New")
 documents zip
           Documents payload → DerivedData/ipa/Documents.zip
 documents install [target]
@@ -93,6 +93,8 @@ NO_INSTALL=no
 UNSIGNED=no
 RUN_SECONDS=45
 LABEL=""
+NOTES_FORM=()
+NOTES_FILE=""
 SIMULATOR_OPTION=""
 DEVICE_OPTION=""
 PLATFORMS=""
@@ -107,13 +109,22 @@ parse_arguments()
 				usage
 				exit 0
 				;;
-			--simulator|--device|--seconds|--label)
+			--simulator|--device|--seconds|--label|--notes|--notes-file)
 				[[ $# -ge 2 ]] || usage_error "$1 needs a value"
 				case "$1" in
 					--simulator) SIMULATOR_OPTION="$2" ;;
 					--device) DEVICE_OPTION="$2" ;;
 					--seconds) RUN_SECONDS="$2" ;;
 					--label) LABEL="$2" ;;
+					--notes|--notes-file)
+						[[ ${#NOTES_FORM[@]} -eq 0 ]] || usage_error "--notes and --notes-file are mutually exclusive"
+						if [[ "$1" == --notes ]]; then
+							NOTES_FORM=(--form-string "notes=$2")
+						else
+							NOTES_FILE="$2"
+							NOTES_FORM=(-F "notes=<$2")
+						fi
+						;;
 				esac
 				GIVEN="$GIVEN $1"
 				shift 2
@@ -823,12 +834,13 @@ create_ipa()
 upload_ipa()
 {
 	require_tool curl
+	[[ -z "$NOTES_FILE" || ( -f "$NOTES_FILE" && -r "$NOTES_FILE" ) ]] || fail "notes file not found or unreadable: $NOTES_FILE"
 	create_ipa signed
 	local archived="$ARCHIVE_DIR/$IPA_NAME"
 	[[ ! -e "$archived" ]] || fail "$archived already exists"
 	mkdir -p "$ARCHIVE_DIR"
 	cp "$IPA_PATH" "$archived"
-	curl --fail --silent --show-error -F "file=@$archived" "$REPO_SERVER_URL"
+	curl --fail --silent --show-error -F "file=@$archived" ${NOTES_FORM[@]+"${NOTES_FORM[@]}"} "$REPO_SERVER_URL"
 	echo
 	echo "Uploaded archive/$IPA_NAME"
 }
@@ -876,7 +888,7 @@ case "$COMMAND" in
 		fi
 		;;
 	upload)
-		allow 0
+		allow 0 --notes --notes-file
 		upload_ipa
 		;;
 	documents)
