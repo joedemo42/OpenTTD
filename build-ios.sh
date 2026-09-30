@@ -22,10 +22,10 @@ deps <command> [args]                        → ios-deps/build-deps.sh (same sy
   dist-clean <all|dep>                        clean + remove ios-deps/source/<dep>
 build|install|run|ipa|upload|documents       → ios/build.sh (same syntax)
   build      [simulator|device|both]          deps, engine, app; build number +1. Default: simulator
-  install    [target] [--no-build]            build + install app only
-  run        [target] [--seconds <1-45>] [--label <name>] [--no-build] [--no-install] [-- <app args>]
-                                              build + install + run (45 s); logs + screenshot → log/
-  ipa        [--unsigned]                     device build → IPA in DerivedData/ipa
+  install    [target]                         install the current build (ios/BUILD_NUMBER)
+  run        [target] [--seconds <1-45>] [--label <name>] [-- <app args>]
+                                              run the installed build (45 s); logs + screenshot → log/
+  ipa        [--unsigned]                     current device build → IPA in DerivedData/ipa
   upload     [--notes <text>|--notes-file <path>]
                                               signed IPA + release notes → archive/ → repo server
   documents  zip | install [target]           Documents payload → ZIP | installed app

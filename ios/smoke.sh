@@ -185,7 +185,7 @@ smoke_app()
 	[[ "$no_build" == yes ]] || "$BUILD" install ${target_options[@]+"${target_options[@]}"}
 	mkdir -p "$LOG_DIR"
 	: > "$LOG_DIR/debugger.log"
-	"$BUILD" run ${target_options[@]+"${target_options[@]}"} --no-install --seconds "$seconds" --label smoke \
+	"$BUILD" run ${target_options[@]+"${target_options[@]}"} --seconds "$seconds" --label smoke \
 		-- "${APP_ARGS[@]}" &
 	local run_pid=$!
 

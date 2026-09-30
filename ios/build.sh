@@ -44,15 +44,15 @@ Target: [simulator|device|both] | --simulator <name|UDID> | --device <name|UDID>
 
 build     [simulator|device|both]
           Missing deps, engine and app; ios/BUILD_NUMBER +1 per invocation. Default: simulator
-install   [target] [--no-build]
-          Build and install the app. Default: simulator
-run       [target] [--seconds <1-45>] [--label <name>] [--no-build] [--no-install] [-- <app args>]
-          Build, install, run non-interactively → log/debugger.log, log/<label>.{log,png}. Default: 45 s
-          --no-build: use last build. --no-install: launch installed app (implies --no-build)
+install   [target]
+          Install the current build (ios/BUILD_NUMBER); none → exit 1. Default: simulator
+run       [target] [--seconds <1-45>] [--label <name>] [-- <app args>]
+          Run the installed current build → log/debugger.log, log/<label>.{log,png}; none → exit 1
+          Default: simulator, 45 s
 ipa       [--unsigned]
-          Device build → IPA in DerivedData/ipa. Default: signed
+          Current device build → IPA in DerivedData/ipa; none → exit 1. Default: signed
 upload    [--notes <text>|--notes-file <path>]
-          Signed IPA of the current tree → archive/ → repo server, with release notes ("What's New")
+          Signed IPA of the current device build → archive/ → repo server + release notes ("What's New")
 documents zip
           Documents payload → DerivedData/ipa/Documents.zip
 documents install [target]
@@ -88,8 +88,6 @@ require_tool()
 POSITIONAL=()
 APP_ARGS=()
 GIVEN=""
-NO_BUILD=no
-NO_INSTALL=no
 UNSIGNED=no
 RUN_SECONDS=45
 LABEL=""
@@ -129,8 +127,6 @@ parse_arguments()
 				GIVEN="$GIVEN $1"
 				shift 2
 				;;
-			--no-build) NO_BUILD=yes; GIVEN="$GIVEN $1"; shift ;;
-			--no-install) NO_INSTALL=yes; GIVEN="$GIVEN $1"; shift ;;
 			--unsigned) UNSIGNED=yes; GIVEN="$GIVEN $1"; shift ;;
 			--)
 				shift
@@ -252,6 +248,28 @@ next_build_number()
 	fi
 	BUILD_NUMBER=$((10#$previous + 1))
 	printf '%s\n' "$BUILD_NUMBER" > "$BUILD_NUMBER_FILE"
+}
+
+# The current build is the app whose CFBundleVersion equals ios/BUILD_NUMBER; only `build` makes one.
+current_build_number()
+{
+	local number=""
+	[[ ! -f "$BUILD_NUMBER_FILE" ]] || number="$(<"$BUILD_NUMBER_FILE")"
+	[[ "$number" =~ ^[0-9]+$ ]] || fail "no build number in ios/BUILD_NUMBER; run: $(script_name) build"
+	BUILD_NUMBER=$((10#$number))
+}
+
+bundle_version()
+{
+	plutil -extract CFBundleVersion raw -o - "$1/Info.plist" 2>/dev/null || true
+}
+
+require_current_build()
+{
+	local found
+	found="$(bundle_version "$(app_path "$1")")"
+	[[ "$found" == "$BUILD_NUMBER" ]] || \
+		fail "no current $1 build: expected build $BUILD_NUMBER, found ${found:-none}; run: $(script_name) build $1"
 }
 
 # Builds only XCFrameworks or slices that are missing; existing artifacts are reused.
@@ -476,7 +494,6 @@ verify_bundled_data()
 xcode_build()
 {
 	local platform="$1"
-	local signing="$2"
 	local arguments=(
 		-project "$PROJECT"
 		-scheme "$SCHEME"
@@ -488,19 +505,15 @@ xcode_build()
 		arguments+=(-destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO)
 	else
 		arguments+=(-destination 'generic/platform=iOS')
-		if [[ "$signing" == unsigned ]]; then
-			arguments+=(CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO)
-		fi
 	fi
 	xcodebuild "${arguments[@]}" "CURRENT_PROJECT_VERSION=$BUILD_NUMBER" build
 	verify_bundled_data "$platform"
 }
 
-# build_app <simulator|device|both> [signed|unsigned]
+# build_app <simulator|device|both>
 build_app()
 {
 	local target="$1"
-	local signing="${2:-signed}"
 	local platforms platform
 	platforms="$(platforms_for "$target")"
 	require_tool cmake ninja lipo plutil shasum tar unzip xcodegen xcodebuild
@@ -521,7 +534,7 @@ build_app()
 	prepare_data "${sdks[0]}"
 	generate_project
 	for platform in $platforms; do
-		xcode_build "$platform" "$signing"
+		xcode_build "$platform"
 	done
 	echo "Built OpenTTD $BUILD_NUMBER ($target)"
 }
@@ -553,17 +566,21 @@ boot_simulator()
 	xcrun simctl bootstatus "$1" -b >/dev/null
 }
 
-device_has_app()
+# CFBundleVersion of the app installed on the device; empty if it is not installed.
+device_app_version()
 {
 	local json
 	json="$(mktemp -t openttd-apps)"
-	local found=no
-	if xcrun devicectl device info apps --device "$DEVICE" --json-output "$json" >/dev/null 2>&1 && \
-		grep -Fq "\"$BUNDLE_ID\"" "$json"; then
-		found=yes
+	if xcrun devicectl device info apps --device "$DEVICE" --bundle-id "$BUNDLE_ID" \
+		--json-output "$json" >/dev/null 2>&1; then
+		plutil -extract result.apps.0.bundleVersion raw -o - "$json" 2>/dev/null || true
 	fi
 	rm -f "$json"
-	[[ "$found" == yes ]]
+}
+
+device_has_app()
+{
+	[[ -n "$(device_app_version)" ]]
 }
 
 device_app_pid()
@@ -581,7 +598,6 @@ install_platform()
 {
 	local app
 	app="$(app_path "$1")"
-	[[ -d "$app" ]] || fail "no $1 build to install; run: $(script_name) build $1"
 	case "$1" in
 		simulator)
 			local simulator
@@ -598,8 +614,11 @@ install_platform()
 
 install_app()
 {
-	[[ "$NO_BUILD" == yes ]] || build_app "$(target_word $PLATFORMS)"
+	current_build_number
 	local platform
+	for platform in $PLATFORMS; do
+		require_current_build "$platform"
+	done
 	for platform in $PLATFORMS; do
 		install_platform "$platform"
 	done
@@ -649,10 +668,12 @@ run_simulator()
 	local simulator
 	simulator="$(resolve_simulator "$SIMULATOR")"
 	boot_simulator "$simulator"
-	if [[ "$NO_INSTALL" == yes ]]; then
-		xcrun simctl get_app_container "$simulator" "$BUNDLE_ID" >/dev/null 2>&1 || \
-			fail "OpenTTD is not installed on $SIMULATOR"
+	local installed found=""
+	if installed="$(xcrun simctl get_app_container "$simulator" "$BUNDLE_ID" app 2>/dev/null)"; then
+		found="$(bundle_version "$installed")"
 	fi
+	[[ "$found" == "$BUILD_NUMBER" ]] || \
+		fail "OpenTTD build $BUILD_NUMBER is not installed on $SIMULATOR (installed: ${found:-none})"
 
 	local started=$SECONDS
 	xcrun simctl launch --terminate-running-process --console "$simulator" "$BUNDLE_ID" \
@@ -679,9 +700,10 @@ run_device()
 {
 	local seconds="$1"
 	local label="$2"
-	if [[ "$NO_INSTALL" == yes ]]; then
-		device_has_app || fail "OpenTTD is not installed on $DEVICE"
-	fi
+	local found
+	found="$(device_app_version)"
+	[[ "$found" == "$BUILD_NUMBER" ]] || \
+		fail "OpenTTD build $BUILD_NUMBER is not installed on $DEVICE (installed: ${found:-none})"
 
 	# --terminate-existing replaces a running instance: the new process has a new PID.
 	local previous_pid pid=""
@@ -724,7 +746,7 @@ run_app()
 	RUN_SECONDS=$((10#$RUN_SECONDS))
 	local label="${LABEL:-$PLATFORMS}"
 	[[ "$label" =~ ^[A-Za-z0-9._-]+$ ]] || usage_error "--label may only contain letters, digits, '.', '_' and '-'"
-	[[ "$NO_INSTALL" == yes ]] || install_app
+	current_build_number
 	require_tool sips
 	mkdir -p "$LOG_DIR"
 	"run_$PLATFORMS" "$RUN_SECONDS" "$label"
@@ -808,23 +830,29 @@ IPA_NAME=""
 create_ipa()
 {
 	local signing="$1"
-	require_tool ditto zip
-	build_app device "$signing"
+	require_tool codesign ditto zip
+	current_build_number
+	require_current_build device
 	local app
 	app="$(app_path device)"
-	local version build
+	local version
 	version="$(plutil -extract CFBundleShortVersionString raw -o - "$app/Info.plist")"
-	build="$(plutil -extract CFBundleVersion raw -o - "$app/Info.plist")"
-	[[ "$build" == "$BUILD_NUMBER" ]] || fail "app reports build $build instead of $BUILD_NUMBER"
 
-	IPA_NAME="OpenTTD-$version-$build.ipa"
+	IPA_NAME="OpenTTD-$version-$BUILD_NUMBER.ipa"
 	IPA_PATH="$IPA_DIR/OpenTTD.ipa"
 	[[ "$signing" == signed ]] || IPA_PATH="$IPA_DIR/OpenTTD-unsigned.ipa"
 	mkdir -p "$IPA_DIR"
 	local temporary
 	temporary="$(mktemp -d "$DERIVED_DATA/IPA.XXXXXX")"
 	mkdir -p "$temporary/Payload"
-	ditto "$app" "$temporary/Payload/OpenTTD.app"
+	local bundle="$temporary/Payload/OpenTTD.app"
+	ditto "$app" "$bundle"
+	# The device build is always signed; the unsigned IPA strips every signature from its copy.
+	if [[ "$signing" == unsigned ]]; then
+		rm -rf "$bundle/_CodeSignature" "$bundle/embedded.mobileprovision"
+		find "$bundle" -maxdepth 1 -type f \( -name OpenTTD -o -name '*.dylib' \) \
+			-exec codesign --remove-signature {} +
+	fi
 	rm -f "$IPA_PATH"
 	(cd "$temporary" && zip -qry "$IPA_PATH" Payload)
 	rm -rf "$temporary"
@@ -869,14 +897,13 @@ case "$COMMAND" in
 		build_app "${POSITIONAL[0]:-simulator}"
 		;;
 	install)
-		allow 1 --simulator --device --no-build
+		allow 1 --simulator --device
 		resolve_targets "${POSITIONAL[0]:-}"
 		install_app
 		;;
 	run)
-		allow 1 --simulator --device --seconds --label --no-build --no-install --
+		allow 1 --simulator --device --seconds --label --
 		resolve_targets "${POSITIONAL[0]:-}"
-		[[ "$NO_INSTALL" == no ]] || NO_BUILD=yes
 		run_app
 		;;
 	ipa)
