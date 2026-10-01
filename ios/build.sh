@@ -44,11 +44,12 @@ Target: [simulator|device|both] | --simulator <name|UDID> | --device <name|UDID>
 
 build     [simulator|device|both]
           Missing deps, engine and app; ios/BUILD_NUMBER +1 per invocation. Default: simulator
+          Each slice that builds becomes the current build (DerivedData/current-<slice>)
 install   [target]
-          Install the current build (ios/BUILD_NUMBER); none → exit 1. Default: simulator
+          Install the current build; none → exit 1. Default: simulator
 run       [target] [--seconds <1-45>] [--label <name>] [-- <app args>]
           Run the installed app → log/debugger.log, log/<label>.{log,png}. Default: simulator, 45 s
-          Not installed or installed build ≠ current build (ios/BUILD_NUMBER) → exit 1; run install first
+          Not installed or installed build ≠ current build → exit 1; run install first
 ipa       [--unsigned]
           Current device build → IPA in DerivedData/ipa; none → exit 1. Default: signed
 upload    [--notes <text>|--notes-file <path>]
@@ -251,26 +252,33 @@ next_build_number()
 	printf '%s\n' "$BUILD_NUMBER" > "$BUILD_NUMBER_FILE"
 }
 
-# The current build is the app whose CFBundleVersion equals ios/BUILD_NUMBER; only `build` makes one.
-current_build_number()
-{
-	local number=""
-	[[ ! -f "$BUILD_NUMBER_FILE" ]] || number="$(<"$BUILD_NUMBER_FILE")"
-	[[ "$number" =~ ^[0-9]+$ ]] || fail "no build number in ios/BUILD_NUMBER; run: $(script_name) build"
-	BUILD_NUMBER=$((10#$number))
-}
-
 bundle_version()
 {
 	plutil -extract CFBundleVersion raw -o - "$1/Info.plist" 2>/dev/null || true
 }
 
+# `build` deletes a slice's stamp before building it and writes the build number only on success.
+stamp_path()
+{
+	printf '%s/current-%s\n' "$DERIVED_DATA" "$1"
+}
+
+CURRENT_BUILD=""
+
+# Sets CURRENT_BUILD for <platform>: its stamp exists and its app has that CFBundleVersion; none → 1.
+find_current_build()
+{
+	local stamp number=""
+	stamp="$(stamp_path "$1")"
+	[[ ! -f "$stamp" ]] || number="$(<"$stamp")"
+	CURRENT_BUILD=""
+	[[ "$number" =~ ^[0-9]+$ && "$(bundle_version "$(app_path "$1")")" == "$number" ]] || return 1
+	CURRENT_BUILD="$number"
+}
+
 require_current_build()
 {
-	local found
-	found="$(bundle_version "$(app_path "$1")")"
-	[[ "$found" == "$BUILD_NUMBER" ]] || \
-		fail "no current $1 build: expected build $BUILD_NUMBER, found ${found:-none}; run: $(script_name) build $1"
+	find_current_build "$1" || fail "no current $1 build; run: $(script_name) build $1"
 }
 
 # Builds only XCFrameworks or slices that are missing; existing artifacts are reused.
@@ -521,6 +529,9 @@ build_app()
 	next_build_number
 	echo "== OpenTTD build $BUILD_NUMBER ($target)"
 	mkdir -p "$DERIVED_DATA"
+	for platform in $platforms; do
+		rm -f "$(stamp_path "$platform")"
+	done
 
 	local sdks=()
 	for platform in $platforms; do
@@ -536,6 +547,7 @@ build_app()
 	generate_project
 	for platform in $platforms; do
 		xcode_build "$platform"
+		printf '%s\n' "$BUILD_NUMBER" > "$(stamp_path "$platform")"
 	done
 	echo "Built OpenTTD $BUILD_NUMBER ($target)"
 }
@@ -587,12 +599,12 @@ simulator_app_version()
 	bundle_version "$installed"
 }
 
-# require_installed <simulator|device> <installed CFBundleVersion>: the target must run the current build.
+# require_installed <simulator|device> <installed CFBundleVersion>: the target must run CURRENT_BUILD.
 require_installed()
 {
 	local name="$SIMULATOR"
 	[[ "$1" == simulator ]] || name="$DEVICE"
-	[[ "$2" == "$BUILD_NUMBER" ]] || fail "OpenTTD on $name: installed build ${2:-none}, current build $BUILD_NUMBER;" \
+	[[ "$2" == "$CURRENT_BUILD" ]] || fail "OpenTTD on $name: installed build ${2:-none}, current build $CURRENT_BUILD;" \
 		"run: $(script_name) install --$1 \"$name\""
 }
 
@@ -627,7 +639,6 @@ install_platform()
 
 install_app()
 {
-	current_build_number
 	local platform
 	for platform in $PLATFORMS; do
 		require_current_build "$platform"
@@ -751,7 +762,7 @@ run_app()
 	RUN_SECONDS=$((10#$RUN_SECONDS))
 	local label="${LABEL:-$PLATFORMS}"
 	[[ "$label" =~ ^[A-Za-z0-9._-]+$ ]] || usage_error "--label may only contain letters, digits, '.', '_' and '-'"
-	current_build_number
+	require_current_build "$PLATFORMS"
 	require_tool sips
 	mkdir -p "$LOG_DIR"
 	"run_$PLATFORMS" "$RUN_SECONDS" "$label"
@@ -763,15 +774,14 @@ run_app()
 documents_zip()
 {
 	require_tool ditto zip
-	current_build_number
 	local platform payload=""
 	for platform in device simulator; do
-		if [[ "$(bundle_version "$(app_path "$platform")")" == "$BUILD_NUMBER" ]]; then
+		if find_current_build "$platform"; then
 			payload="$(app_path "$platform")/SeedData"
 			break
 		fi
 	done
-	[[ -n "$payload" ]] || fail "no current build: expected build $BUILD_NUMBER, found none; run: $(script_name) build"
+	[[ -n "$payload" ]] || fail "no current build; run: $(script_name) build"
 	mkdir -p "$IPA_DIR"
 	local output="$IPA_DIR/Documents.zip"
 	local temporary
@@ -795,7 +805,6 @@ documents_zip()
 # Existing Documents files are kept on the simulator; CoreDevice merges directories.
 documents_install()
 {
-	current_build_number
 	local platform simulator=""
 	for platform in $PLATFORMS; do
 		require_current_build "$platform"
@@ -843,14 +852,13 @@ create_ipa()
 {
 	local signing="$1"
 	require_tool codesign ditto zip
-	current_build_number
 	require_current_build device
 	local app
 	app="$(app_path device)"
 	local version
 	version="$(plutil -extract CFBundleShortVersionString raw -o - "$app/Info.plist")"
 
-	IPA_NAME="OpenTTD-$version-$BUILD_NUMBER.ipa"
+	IPA_NAME="OpenTTD-$version-$CURRENT_BUILD.ipa"
 	IPA_PATH="$IPA_DIR/OpenTTD.ipa"
 	[[ "$signing" == signed ]] || IPA_PATH="$IPA_DIR/OpenTTD-unsigned.ipa"
 	mkdir -p "$IPA_DIR"
