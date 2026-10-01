@@ -20,6 +20,10 @@ settings:
     SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
     SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
     TARGETED_DEVICE_FAMILY: "1,2"
+  configs:
+    # Strips the linked product in a plain `xcodebuild build`, after the dSYM is written.
+    Release:
+      DEPLOYMENT_POSTPROCESSING: YES
 targets:
   OpenTTD:
     type: application

@@ -41,19 +41,22 @@ usage()
 Usage: $(script_name) <command> [args] [options]
 Target: [simulator|device|both] | --simulator <name|UDID> | --device <name|UDID>
         Default: simulator "$DEFAULT_SIMULATOR"; the default device is "$DEFAULT_DEVICE".
+Configuration: --release (optimized, stripped, dSYM) for build, install, run, ipa, upload. Default: debug
+        Slice = platform + configuration; both = simulator + device of the selected configuration.
 
-build     [simulator|device|both]
+build     [simulator|device|both] [--release]
           Missing deps, engine and app; ios/BUILD_NUMBER +1 per invocation. Default: simulator
-          Each slice that builds becomes the current build (DerivedData/current-<slice>)
-install   [target]
+          Each slice that builds becomes the current build (DerivedData/current-<platform>-<configuration>)
+install   [target] [--release]
           Install the current build; none → exit 1. Default: simulator
-run       [target] [--seconds <1-45>] [--label <name>] [-- <app args>]
+run       [target] [--release] [--seconds <1-45>] [--label <name>] [-- <app args>]
           Run the installed app → log/debugger.log, log/<label>.{log,png}. Default: simulator, 45 s
           Not installed or installed build ≠ current build → exit 1; run install first
-ipa       [--unsigned]
+ipa       [--unsigned] [--release]
           Current device build → IPA in DerivedData/ipa; none → exit 1. Default: signed
-upload    [--notes <text>|--notes-file <path>]
+upload    [--notes <text>|--notes-file <path>] [--release]
           Signed IPA of the current device build → archive/ → repo server + release notes ("What's New")
+          Release: dSYM → archive/<IPA name>.dSYM.zip, not uploaded. Debug: notes start with [DEBUG BUILD]
 documents zip
           Documents payload of the current build → DerivedData/ipa/Documents.zip; none → exit 1
 documents install [target]
@@ -94,7 +97,10 @@ UNSIGNED=no
 RUN_SECONDS=45
 LABEL=""
 NOTES_FORM=()
+NOTES_TEXT=""
 NOTES_FILE=""
+CONFIGURATION=Debug
+RELEASE_OPTION=""
 SIMULATOR_OPTION=""
 DEVICE_OPTION=""
 PLATFORMS=""
@@ -119,6 +125,7 @@ parse_arguments()
 					--notes|--notes-file)
 						[[ ${#NOTES_FORM[@]} -eq 0 ]] || usage_error "--notes and --notes-file are mutually exclusive"
 						if [[ "$1" == --notes ]]; then
+							NOTES_TEXT="$2"
 							NOTES_FORM=(--form-string "notes=$2")
 						else
 							NOTES_FILE="$2"
@@ -130,6 +137,7 @@ parse_arguments()
 				shift 2
 				;;
 			--unsigned) UNSIGNED=yes; GIVEN="$GIVEN $1"; shift ;;
+			--release) CONFIGURATION=Release; RELEASE_OPTION=" --release"; GIVEN="$GIVEN $1"; shift ;;
 			--)
 				shift
 				APP_ARGS=("$@")
@@ -230,8 +238,8 @@ has_slice()
 app_path()
 {
 	case "$1" in
-		simulator) echo "$DERIVED_DATA/Build/Products/Debug-iphonesimulator/OpenTTD.app" ;;
-		device) echo "$DERIVED_DATA/Build/Products/Debug-iphoneos/OpenTTD.app" ;;
+		simulator) echo "$DERIVED_DATA/Build/Products/$CONFIGURATION-iphonesimulator/OpenTTD.app" ;;
+		device) echo "$DERIVED_DATA/Build/Products/$CONFIGURATION-iphoneos/OpenTTD.app" ;;
 	esac
 }
 
@@ -258,9 +266,10 @@ bundle_version()
 }
 
 # `build` deletes a slice's stamp before building it and writes the build number only on success.
+# Slice = platform + configuration: current-device-debug, current-device-release, ...
 stamp_path()
 {
-	printf '%s/current-%s\n' "$DERIVED_DATA" "$1"
+	printf '%s/current-%s-%s\n' "$DERIVED_DATA" "$1" "$(tr '[:upper:]' '[:lower:]' <<< "$CONFIGURATION")"
 }
 
 CURRENT_BUILD=""
@@ -278,7 +287,7 @@ find_current_build()
 
 require_current_build()
 {
-	find_current_build "$1" || fail "no current $1 build; run: $(script_name) build $1"
+	find_current_build "$1" || fail "no current $1 build; run: $(script_name) build $1$RELEASE_OPTION"
 }
 
 # Builds only XCFrameworks or slices that are missing; existing artifacts are reused.
@@ -311,13 +320,16 @@ engine_arguments()
 	local sdk="$1"
 	local slice
 	slice="$(slice_id "$sdk")"
+	# Debug apps keep the optimized engine; Release uses upstream's release build type, whose -g feeds the dSYM.
+	local build_type=Release
+	[[ "$CONFIGURATION" == Debug ]] || build_type=RelWithDebInfo
 	printf '%s\n' \
 		-DCMAKE_SYSTEM_NAME=iOS \
 		-DCMAKE_OSX_SYSROOT="$(xcrun --sdk "$sdk" --show-sdk-path)" \
 		-DCMAKE_OSX_ARCHITECTURES=arm64 \
 		-DCMAKE_OSX_DEPLOYMENT_TARGET="$IOS_MIN_VERSION" \
 		-DCMAKE_CXX_COMPILER="$(xcrun --find clang++)" \
-		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_BUILD_TYPE="$build_type" \
 		-DCMAKE_POSITION_INDEPENDENT_CODE=ON \
 		-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
 		-DHOST_BINARY_DIR="$(cmake_tree host)" \
@@ -382,8 +394,8 @@ build_engine_slice()
 	lipo -info "$archive" | grep -q 'arm64' || fail "$sdk engine archive is not arm64"
 }
 
-# Packages every current engine slice with the public bridge header; unchanged
-# packages are kept so Xcode does not relink.
+# Packages every current engine slice of the selected configuration with the public
+# bridge header; unchanged packages are kept so Xcode does not relink.
 package_engine()
 {
 	local arguments=()
@@ -506,7 +518,7 @@ xcode_build()
 	local arguments=(
 		-project "$PROJECT"
 		-scheme "$SCHEME"
-		-configuration Debug
+		-configuration "$CONFIGURATION"
 		-derivedDataPath "$DERIVED_DATA"
 		-allowProvisioningUpdates
 	)
@@ -605,7 +617,7 @@ require_installed()
 	local name="$SIMULATOR"
 	[[ "$1" == simulator ]] || name="$DEVICE"
 	[[ "$2" == "$CURRENT_BUILD" ]] || fail "OpenTTD on $name: installed build ${2:-none}, current build $CURRENT_BUILD;" \
-		"run: $(script_name) install --$1 \"$name\""
+		"run: $(script_name) install --$1 \"$name\"$RELEASE_OPTION"
 }
 
 # PID of the process whose executable URL is <url>; --search ignores case and also lists other apps' openttd.app/openttd.
@@ -894,11 +906,28 @@ upload_ipa()
 	create_ipa signed
 	local archived="$ARCHIVE_DIR/$IPA_NAME"
 	[[ ! -e "$archived" ]] || fail "$archived already exists"
+	# Release keeps the matching dSYM next to the IPA; it is not uploaded.
+	local dsym binary dsym_zip="$ARCHIVE_DIR/${IPA_NAME%.ipa}.dSYM.zip"
+	if [[ "$CONFIGURATION" == Release ]]; then
+		binary="$(app_path device)/OpenTTD"
+		dsym="$(app_path device).dSYM"
+		[[ "$(xcrun dwarfdump --uuid "$dsym" 2>/dev/null | awk '{print $2}')" == "$(xcrun dwarfdump --uuid "$binary" | awk '{print $2}')" ]] || \
+			fail "$dsym is missing or does not match $binary"
+		[[ ! -e "$dsym_zip" ]] || fail "$dsym_zip already exists"
+	else
+		# The repo server cannot tell debug from release builds, so debug notes say it first.
+		local notes="[DEBUG BUILD]"
+		[[ -z "$NOTES_FILE" ]] || NOTES_TEXT="$(<"$NOTES_FILE")"
+		[[ ${#NOTES_FORM[@]} -eq 0 ]] || notes+=$'\n'"$NOTES_TEXT"
+		NOTES_FORM=(--form-string "notes=$notes")
+	fi
 	mkdir -p "$ARCHIVE_DIR"
 	cp "$IPA_PATH" "$archived"
+	[[ "$CONFIGURATION" == Debug ]] || ditto -c -k --keepParent "$dsym" "$dsym_zip"
 	curl --fail --silent --show-error -F "file=@$archived" ${NOTES_FORM[@]+"${NOTES_FORM[@]}"} "$REPO_SERVER_URL"
 	echo
 	echo "Uploaded archive/$IPA_NAME"
+	[[ "$CONFIGURATION" == Debug ]] || echo "Kept archive/${dsym_zip##*/}"
 }
 
 # Main ---------------------------------------------------------------------------
@@ -920,22 +949,22 @@ require_tool xcrun
 
 case "$COMMAND" in
 	build)
-		allow 1
+		allow 1 --release
 		platforms_for "${POSITIONAL[0]:-simulator}" >/dev/null || usage_error "unknown target: ${POSITIONAL[0]}"
 		build_app "${POSITIONAL[0]:-simulator}"
 		;;
 	install)
-		allow 1 --simulator --device
+		allow 1 --simulator --device --release
 		resolve_targets "${POSITIONAL[0]:-}"
 		install_app
 		;;
 	run)
-		allow 1 --simulator --device --seconds --label --
+		allow 1 --simulator --device --seconds --label --release --
 		resolve_targets "${POSITIONAL[0]:-}"
 		run_app
 		;;
 	ipa)
-		allow 0 --unsigned
+		allow 0 --unsigned --release
 		if [[ "$UNSIGNED" == yes ]]; then
 			create_ipa unsigned
 		else
@@ -943,7 +972,7 @@ case "$COMMAND" in
 		fi
 		;;
 	upload)
-		allow 0 --notes --notes-file
+		allow 0 --notes --notes-file --release
 		upload_ipa
 		;;
 	documents)

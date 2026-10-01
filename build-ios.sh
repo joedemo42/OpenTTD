@@ -32,6 +32,7 @@ build|install|run|ipa|upload|documents       → ios/build.sh (same syntax)
 clean [app|deps|all]                         app: DerivedData, deps: every dependency. Default: app
 
 Target: [simulator|device|both] | --simulator <name|UDID> | --device <name|UDID>. Default: simulator
+Configuration: --release (optimized, stripped, dSYM) for build, install, run, ipa, upload. Default: debug
 Details: $name deps --help, $name build --help
 EOF
 }
