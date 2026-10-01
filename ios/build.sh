@@ -579,14 +579,14 @@ boot_simulator()
 	xcrun simctl bootstatus "$1" -b >/dev/null
 }
 
-# CFBundleVersion of the app installed on the device; empty if it is not installed.
-device_app_version()
+# <key> (bundleVersion, url) of the app installed on the device; empty if it is not installed.
+device_app()
 {
 	local json
 	json="$(mktemp -t openttd-apps)"
 	if xcrun devicectl device info apps --device "$DEVICE" --bundle-id "$BUNDLE_ID" \
 		--json-output "$json" >/dev/null 2>&1; then
-		plutil -extract result.apps.0.bundleVersion raw -o - "$json" 2>/dev/null || true
+		plutil -extract "result.apps.0.$1" raw -o - "$json" 2>/dev/null || true
 	fi
 	rm -f "$json"
 }
@@ -608,13 +608,20 @@ require_installed()
 		"run: $(script_name) install --$1 \"$name\""
 }
 
+# PID of the process whose executable URL is <url>; --search ignores case and also lists other apps' openttd.app/openttd.
 device_app_pid()
 {
-	local json
+	local json found i=0
 	json="$(mktemp -t openttd-processes)"
 	if xcrun devicectl device info processes --device "$DEVICE" \
 		--search "/OpenTTD.app/OpenTTD" --json-output "$json" >/dev/null 2>&1; then
-		plutil -extract result.runningProcesses.0.processIdentifier raw -o - "$json" 2>/dev/null || true
+		while found="$(plutil -extract "result.runningProcesses.$i.executable" raw -o - "$json" 2>/dev/null)"; do
+			if [[ "$found" == "$1" ]]; then
+				plutil -extract "result.runningProcesses.$i.processIdentifier" raw -o - "$json"
+				break
+			fi
+			i=$((i + 1))
+		done
 	fi
 	rm -f "$json"
 }
@@ -719,11 +726,12 @@ run_device()
 {
 	local seconds="$1"
 	local label="$2"
-	require_installed device "$(device_app_version)"
+	require_installed device "$(device_app bundleVersion)"
 
 	# --terminate-existing replaces a running instance: the new process has a new PID.
-	local previous_pid pid=""
-	previous_pid="$(device_app_pid)"
+	local executable previous_pid pid=""
+	executable="$(device_app url)OpenTTD"
+	previous_pid="$(device_app_pid "$executable")"
 	xcrun devicectl device process launch --terminate-existing --console --timeout "$((seconds + 120))" \
 		--device "$DEVICE" "$BUNDLE_ID" ${APP_ARGS[@]+"${APP_ARGS[@]}"} > "$LOG_DIR/debugger.log" 2>&1 &
 	local console_pid=$!
@@ -735,7 +743,7 @@ run_device()
 		fi
 		sleep 1
 		waited=$((waited + 1))
-		pid="$(device_app_pid)"
+		pid="$(device_app_pid "$executable")"
 	done
 	local alive=yes
 	hold "$seconds" "$console_pid" || alive=no
@@ -813,7 +821,7 @@ documents_install()
 			boot_simulator "$simulator"
 			require_installed simulator "$(simulator_app_version "$simulator")"
 		else
-			require_installed device "$(device_app_version)"
+			require_installed device "$(device_app bundleVersion)"
 		fi
 	done
 	for platform in $PLATFORMS; do
