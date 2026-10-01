@@ -54,9 +54,10 @@ ipa       [--unsigned]
 upload    [--notes <text>|--notes-file <path>]
           Signed IPA of the current device build → archive/ → repo server + release notes ("What's New")
 documents zip
-          Documents payload → DerivedData/ipa/Documents.zip
+          Documents payload of the current build → DerivedData/ipa/Documents.zip; none → exit 1
 documents install [target]
-          Copy the payload into the installed app's Documents, no reinstall. Default: simulator
+          Copy the current build's payload into its installed app's Documents, no reinstall; none → exit 1
+          Default: simulator
 clean
           Remove app build output (DerivedData)
 EOF
@@ -578,9 +579,18 @@ device_app_version()
 	rm -f "$json"
 }
 
-device_has_app()
+# CFBundleVersion of the app installed on simulator <UDID>; empty if it is not installed.
+simulator_app_version()
 {
-	[[ -n "$(device_app_version)" ]]
+	local installed
+	installed="$(xcrun simctl get_app_container "$1" "$BUNDLE_ID" app 2>/dev/null)" || return 0
+	bundle_version "$installed"
+}
+
+# require_installed <target name> <installed CFBundleVersion>
+require_installed()
+{
+	[[ "$2" == "$BUILD_NUMBER" ]] || fail "OpenTTD build $BUILD_NUMBER is not installed on $1 (installed: ${2:-none})"
 }
 
 device_app_pid()
@@ -668,12 +678,7 @@ run_simulator()
 	local simulator
 	simulator="$(resolve_simulator "$SIMULATOR")"
 	boot_simulator "$simulator"
-	local installed found=""
-	if installed="$(xcrun simctl get_app_container "$simulator" "$BUNDLE_ID" app 2>/dev/null)"; then
-		found="$(bundle_version "$installed")"
-	fi
-	[[ "$found" == "$BUILD_NUMBER" ]] || \
-		fail "OpenTTD build $BUILD_NUMBER is not installed on $SIMULATOR (installed: ${found:-none})"
+	require_installed "$SIMULATOR" "$(simulator_app_version "$simulator")"
 
 	local started=$SECONDS
 	xcrun simctl launch --terminate-running-process --console "$simulator" "$BUNDLE_ID" \
@@ -700,10 +705,7 @@ run_device()
 {
 	local seconds="$1"
 	local label="$2"
-	local found
-	found="$(device_app_version)"
-	[[ "$found" == "$BUILD_NUMBER" ]] || \
-		fail "OpenTTD build $BUILD_NUMBER is not installed on $DEVICE (installed: ${found:-none})"
+	require_installed "$DEVICE" "$(device_app_version)"
 
 	# --terminate-existing replaces a running instance: the new process has a new PID.
 	local previous_pid pid=""
@@ -754,25 +756,24 @@ run_app()
 
 # Documents payload ---------------------------------------------------------------
 
-# The payload needs generated languages: the simulator engine slice is built as needed.
-ensure_payload()
-{
-	require_tool cmake ninja lipo plutil shasum tar unzip
-	mkdir -p "$DERIVED_DATA"
-	ensure_deps iphonesimulator
-	build_engine_slice iphonesimulator
-	prepare_data iphonesimulator
-}
-
+# The payload is the SeedData bundled in the current build; both platforms bundle the same one.
 documents_zip()
 {
 	require_tool ditto zip
-	ensure_payload
+	current_build_number
+	local platform payload=""
+	for platform in device simulator; do
+		if [[ "$(bundle_version "$(app_path "$platform")")" == "$BUILD_NUMBER" ]]; then
+			payload="$(app_path "$platform")/SeedData"
+			break
+		fi
+	done
+	[[ -n "$payload" ]] || fail "no current build: expected build $BUILD_NUMBER, found none; run: $(script_name) build"
 	mkdir -p "$IPA_DIR"
 	local output="$IPA_DIR/Documents.zip"
 	local temporary
 	temporary="$(mktemp -d "$DERIVED_DATA/DocumentsZip.XXXXXX")"
-	ditto "$SEED_DATA" "$temporary/Documents"
+	ditto "$payload" "$temporary/Documents"
 	rm -f "$output"
 	(cd "$temporary" && zip -qry "$output" Documents)
 	rm -rf "$temporary"
@@ -791,25 +792,33 @@ documents_zip()
 # Existing Documents files are kept on the simulator; CoreDevice merges directories.
 documents_install()
 {
-	ensure_payload
-	local platform
+	current_build_number
+	local platform simulator=""
 	for platform in $PLATFORMS; do
+		require_current_build "$platform"
+		if [[ "$platform" == simulator ]]; then
+			simulator="$(resolve_simulator "$SIMULATOR")"
+			boot_simulator "$simulator"
+			require_installed "$SIMULATOR" "$(simulator_app_version "$simulator")"
+		else
+			require_installed "$DEVICE" "$(device_app_version)"
+		fi
+	done
+	for platform in $PLATFORMS; do
+		local payload
+		payload="$(app_path "$platform")/SeedData"
 		case "$platform" in
 			simulator)
 				require_tool rsync
-				local simulator container
-				simulator="$(resolve_simulator "$SIMULATOR")"
-				boot_simulator "$simulator"
-				container="$(xcrun simctl get_app_container "$simulator" "$BUNDLE_ID" data 2>/dev/null)" || \
-					fail "OpenTTD is not installed on $SIMULATOR"
+				local container
+				container="$(xcrun simctl get_app_container "$simulator" "$BUNDLE_ID" data)"
 				mkdir -p "$container/Documents"
-				rsync -a --ignore-existing "$SEED_DATA/" "$container/Documents/"
+				rsync -a --ignore-existing "$payload/" "$container/Documents/"
 				echo "Installed the Documents payload on $SIMULATOR"
 				;;
 			device)
-				device_has_app || fail "OpenTTD is not installed on $DEVICE"
 				local item
-				for item in "$SEED_DATA"/*; do
+				for item in "$payload"/*; do
 					xcrun devicectl device copy to --device "$DEVICE" \
 						--source "$item" \
 						--destination Documents \

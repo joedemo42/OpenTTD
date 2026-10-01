@@ -12,7 +12,6 @@ BUILD="$IOS_DIR/build.sh"
 BUNDLE_ID="com.example.openttd"
 DEFAULT_SIMULATOR="iPad Air 11-inch (M4)"
 HOST_TESTS="$DERIVED_DATA/OpenTTD-engine/host-tests"
-SEED_DATA="$DERIVED_DATA/DataPackage/SeedData"
 TIMGM6MB_SF2_SHA256="c5378b62028c920cb11e4803327983fee2f2cdff5dc89c708e39da417e51c854"
 # iOS drivers with the base sets whose runtime markers are asserted.
 APP_ARGS=(-s ios -S OpenSFX -M OpenMSX -d driver=1,misc=1)
@@ -33,10 +32,10 @@ Usage: $(script_name) <command> [options]
 host
       Build the native Debug tree and run all upstream and port host tests (ctest).
 data
-      Stage the Documents payload; native OpenTTD must discover OpenGFX, OpenSFX and OpenMSX in it.
-app   [simulator|device] [--simulator <name|UDID> | --device <name|UDID>] [--seconds <1-45>] [--no-build]
+      Current build's Documents.zip: native OpenTTD must discover OpenGFX, OpenSFX and OpenMSX in it.
+app   [simulator|device] [--simulator <name|UDID> | --device <name|UDID>] [--seconds <1-45>]
       Run the app and assert its engine, Documents, Metal, audio and MIDI markers. Default: simulator, 45 s
-      Simulator runs of 15 s or more include a background/foreground cycle.
+      Uses the installed current build; simulator runs ≥ 15 s add a background/foreground cycle.
 EOF
 }
 
@@ -108,27 +107,27 @@ smoke_host()
 
 smoke_data()
 {
-	require_tool cmake ditto ninja shasum
+	require_tool cmake ninja shasum unzip
 	"$BUILD" documents zip
-	[[ ! -e "$SEED_DATA/OpenTTD" ]] || fail "staged data contains a forbidden OpenTTD wrapper directory"
-	[[ -d "$SEED_DATA/save/autosave" ]] || fail "staged data is missing save/autosave"
-	[[ -d "$SEED_DATA/scenario/heightmap" ]] || fail "staged data is missing scenario/heightmap"
-	[[ "$(shasum -a 256 "$SEED_DATA/baseset/timgm6mb/TimGM6mb.sf2" | awk '{print $1}')" == "$TIMGM6MB_SF2_SHA256" ]] || \
-		fail "staged TimGM6mb checksum mismatch"
+	local temporary
+	temporary="$(mktemp -d "$DERIVED_DATA/DataValidation.XXXXXX")"
+	local validation_root="$temporary/Documents"
+	unzip -q "$DERIVED_DATA/ipa/Documents.zip" -d "$temporary"
+	[[ ! -e "$validation_root/OpenTTD" ]] || fail "Documents.zip contains a forbidden OpenTTD wrapper directory"
+	[[ -d "$validation_root/save/autosave" ]] || fail "Documents.zip is missing save/autosave"
+	[[ -d "$validation_root/scenario/heightmap" ]] || fail "Documents.zip is missing scenario/heightmap"
+	[[ "$(shasum -a 256 "$validation_root/baseset/timgm6mb/TimGM6mb.sf2" | awk '{print $1}')" == "$TIMGM6MB_SF2_SHA256" ]] || \
+		fail "Documents.zip TimGM6mb checksum mismatch"
 
 	configure_host_tests
 	cmake --build "$HOST_TESTS" --target openttd --parallel
 	mkdir -p "$LOG_DIR"
-	local temporary
-	temporary="$(mktemp -d "$DERIVED_DATA/DataValidation.XXXXXX")"
-	local validation_root="$temporary/Documents"
-	ditto "$SEED_DATA" "$validation_root"
 	"$HOST_TESTS/openttd" -X -x -c "$validation_root/openttd.cfg" -d misc=1 -h \
 		> "$LOG_DIR/data-discovery.log" 2>&1
 	grep -Fq 'OpenGFX' "$LOG_DIR/data-discovery.log" || fail "OpenGFX was not discovered"
 	grep -Fq 'OpenSFX' "$LOG_DIR/data-discovery.log" || fail "OpenSFX was not discovered"
 	grep -Fq 'OpenMSX' "$LOG_DIR/data-discovery.log" || fail "OpenMSX was not discovered"
-	grep -Fq "$validation_root" "$LOG_DIR/data-discovery.log" || fail "the staged Documents root was not searched"
+	grep -Fq "$validation_root" "$LOG_DIR/data-discovery.log" || fail "the Documents.zip root was not searched"
 	rm -rf "$temporary"
 	echo "Documents payload discovery passed; details are in log/data-discovery.log"
 }
@@ -150,7 +149,6 @@ smoke_app()
 {
 	local platform=""
 	local seconds=45
-	local no_build=no
 	local target_options=()
 	local simulator_name="$DEFAULT_SIMULATOR"
 	while [[ $# -gt 0 ]]; do
@@ -174,7 +172,6 @@ smoke_app()
 				seconds="$2"
 				shift 2
 				;;
-			--no-build) no_build=yes; shift ;;
 			*) usage_error "app does not take $1" ;;
 		esac
 	done
@@ -182,7 +179,6 @@ smoke_app()
 	[[ "$seconds" =~ ^[0-9]+$ ]] && (( 10#$seconds >= 1 && 10#$seconds <= 45 )) || usage_error "--seconds must be 1-45"
 	seconds=$((10#$seconds))
 
-	[[ "$no_build" == yes ]] || "$BUILD" install ${target_options[@]+"${target_options[@]}"}
 	mkdir -p "$LOG_DIR"
 	: > "$LOG_DIR/debugger.log"
 	"$BUILD" run ${target_options[@]+"${target_options[@]}"} --seconds "$seconds" --label smoke \
