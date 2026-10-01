@@ -47,8 +47,8 @@ build     [simulator|device|both]
 install   [target]
           Install the current build (ios/BUILD_NUMBER); none → exit 1. Default: simulator
 run       [target] [--seconds <1-45>] [--label <name>] [-- <app args>]
-          Run the installed current build → log/debugger.log, log/<label>.{log,png}; none → exit 1
-          Default: simulator, 45 s
+          Run the installed app → log/debugger.log, log/<label>.{log,png}. Default: simulator, 45 s
+          Not installed or installed build ≠ current build (ios/BUILD_NUMBER) → exit 1; run install first
 ipa       [--unsigned]
           Current device build → IPA in DerivedData/ipa; none → exit 1. Default: signed
 upload    [--notes <text>|--notes-file <path>]
@@ -587,10 +587,13 @@ simulator_app_version()
 	bundle_version "$installed"
 }
 
-# require_installed <target name> <installed CFBundleVersion>
+# require_installed <simulator|device> <installed CFBundleVersion>: the target must run the current build.
 require_installed()
 {
-	[[ "$2" == "$BUILD_NUMBER" ]] || fail "OpenTTD build $BUILD_NUMBER is not installed on $1 (installed: ${2:-none})"
+	local name="$SIMULATOR"
+	[[ "$1" == simulator ]] || name="$DEVICE"
+	[[ "$2" == "$BUILD_NUMBER" ]] || fail "OpenTTD on $name: installed build ${2:-none}, current build $BUILD_NUMBER;" \
+		"run: $(script_name) install --$1 \"$name\""
 }
 
 device_app_pid()
@@ -678,7 +681,7 @@ run_simulator()
 	local simulator
 	simulator="$(resolve_simulator "$SIMULATOR")"
 	boot_simulator "$simulator"
-	require_installed "$SIMULATOR" "$(simulator_app_version "$simulator")"
+	require_installed simulator "$(simulator_app_version "$simulator")"
 
 	local started=$SECONDS
 	xcrun simctl launch --terminate-running-process --console "$simulator" "$BUNDLE_ID" \
@@ -705,7 +708,7 @@ run_device()
 {
 	local seconds="$1"
 	local label="$2"
-	require_installed "$DEVICE" "$(device_app_version)"
+	require_installed device "$(device_app_version)"
 
 	# --terminate-existing replaces a running instance: the new process has a new PID.
 	local previous_pid pid=""
@@ -799,9 +802,9 @@ documents_install()
 		if [[ "$platform" == simulator ]]; then
 			simulator="$(resolve_simulator "$SIMULATOR")"
 			boot_simulator "$simulator"
-			require_installed "$SIMULATOR" "$(simulator_app_version "$simulator")"
+			require_installed simulator "$(simulator_app_version "$simulator")"
 		else
-			require_installed "$DEVICE" "$(device_app_version)"
+			require_installed device "$(device_app_version)"
 		fi
 	done
 	for platform in $PLATFORMS; do
