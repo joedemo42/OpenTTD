@@ -14,7 +14,7 @@ DEFAULT_SIMULATOR="iPad Air 11-inch (M4)"
 HOST_TESTS="$DERIVED_DATA/OpenTTD-engine/host-tests"
 TIMGM6MB_SF2_SHA256="c5378b62028c920cb11e4803327983fee2f2cdff5dc89c708e39da417e51c854"
 # iOS drivers with the base sets whose runtime markers are asserted.
-APP_ARGS=(-s ios -S OpenSFX -M OpenMSX -d driver=1,misc=1)
+APP_ARGS=(-s ios -S OpenSFX -M OpenMSX -d driver=1,misc=1,net=3)
 
 script_name()
 {
@@ -36,6 +36,8 @@ data
 app   [simulator|device] [--simulator <name|UDID> | --device <name|UDID>] [--seconds <1-45>]
       Run the app and assert its engine, Documents, Metal, audio and MIDI markers. Default: simulator, 45 s
       Uses the installed current build; simulator runs ≥ 15 s add a background/foreground cycle.
+multiplayer [--simulator <name|UDID>] [--host <address>]
+      A simulator client joins a temporary same-revision host server: map transfer and sync for 45 s.
 EOF
 }
 
@@ -205,6 +207,7 @@ smoke_app()
 		fail "the app used the forbidden Documents/OpenTTD wrapper"
 	require_marker 'IOS_VIDEO READY renderer=metal'
 	require_marker 'IOS_VIDEO PRESENT first_dirty='
+	require_marker 'IOS_HTTP READY backend=nsurlsession tls=system'
 	require_markers 'IOS_AUDIO READY rate=' 'sound_set=OpenSFX'
 	require_marker 'IOS_AUDIO CALLBACK active=yes'
 	require_markers 'IOS_MUSIC READY synth=midisynth' 'music_set=OpenMSX'
@@ -228,6 +231,134 @@ smoke_app()
 	echo "App smoke test passed on the $platform ($seconds s); evidence is in log/debugger.log and log/smoke.*"
 }
 
+MULTIPLAYER_SERVER_PID=""
+MULTIPLAYER_TEST_ROOT=""
+MULTIPLAYER_CLIENT_DIRECTORY=""
+MULTIPLAYER_PRIVATE_WRITTEN=no
+
+cleanup_multiplayer()
+{
+	if [[ -n "$MULTIPLAYER_SERVER_PID" ]] && kill -0 "$MULTIPLAYER_SERVER_PID" 2>/dev/null; then
+		kill -TERM "$MULTIPLAYER_SERVER_PID" 2>/dev/null || true
+		wait "$MULTIPLAYER_SERVER_PID" 2>/dev/null || true
+	fi
+	if [[ "$MULTIPLAYER_CLIENT_DIRECTORY" == */Documents/.m14-network-test.* ]]; then
+		# The user's private.cfg goes back before the directory holding it is removed.
+		local private_file="${MULTIPLAYER_CLIENT_DIRECTORY%/*}/private.cfg"
+		if [[ -e "$MULTIPLAYER_CLIENT_DIRECTORY/user-private.cfg" ]]; then
+			mv -f -- "$MULTIPLAYER_CLIENT_DIRECTORY/user-private.cfg" "$private_file"
+		elif [[ "$MULTIPLAYER_PRIVATE_WRITTEN" == yes ]]; then
+			rm -f -- "$private_file"
+		fi
+		rm -rf -- "$MULTIPLAYER_CLIENT_DIRECTORY"
+	fi
+	if [[ "$MULTIPLAYER_TEST_ROOT" == "$DERIVED_DATA/NetworkTest."* ]]; then
+		rm -rf -- "$MULTIPLAYER_TEST_ROOT"
+	fi
+	MULTIPLAYER_SERVER_PID=""
+	MULTIPLAYER_TEST_ROOT=""
+	MULTIPLAYER_CLIENT_DIRECTORY=""
+	MULTIPLAYER_PRIVATE_WRITTEN=no
+}
+
+# A simulator client joins a temporary native server of the same revision.
+smoke_multiplayer()
+{
+	local simulator_name="$DEFAULT_SIMULATOR"
+	local host_address=""
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--simulator|--host)
+				[[ $# -ge 2 ]] || usage_error "$1 needs a value"
+				if [[ "$1" == --host ]]; then
+					host_address="$2"
+				else
+					simulator_name="$2"
+				fi
+				shift 2
+				;;
+			*) usage_error "multiplayer does not take $1" ;;
+		esac
+	done
+	if [[ -z "$host_address" ]]; then
+		host_address="$(ifconfig en0 2>/dev/null | awk '$1 == "inet" && $2 !~ /^127\./ { print $2; exit }' || true)"
+	fi
+	if [[ -z "$host_address" ]]; then
+		host_address="$(ifconfig 2>/dev/null | awk '$1 == "inet" && $2 !~ /^(127\.|169\.254\.)/ { print $2; exit }' || true)"
+	fi
+	[[ "$host_address" =~ ^[[:xdigit:].:]+$ ]] || \
+		fail "could not determine a host address reachable from the simulator; pass --host"
+
+	require_tool cmake ninja
+	configure_host_tests
+	cmake --build "$HOST_TESTS" --target openttd --parallel
+
+	local simulator container
+	simulator="$(resolve_simulator "$simulator_name")"
+	container="$(xcrun simctl get_app_container "$simulator" "$BUNDLE_ID" data 2>/dev/null)" || \
+		fail "OpenTTD is not installed on $simulator_name"
+	trap cleanup_multiplayer EXIT INT TERM
+	MULTIPLAYER_TEST_ROOT="$(mktemp -d "$DERIVED_DATA/NetworkTest.XXXXXX")"
+	MULTIPLAYER_CLIENT_DIRECTORY="$(mktemp -d "$container/Documents/.m14-network-test.XXXXXX")"
+	local server_config="$MULTIPLAYER_TEST_ROOT/openttd.cfg"
+	local client_config="$MULTIPLAYER_CLIENT_DIRECTORY/openttd.cfg"
+	local port=39799
+
+	# These minimal current-version configs isolate the test from the user's settings.
+	printf '%s\n' \
+		'[network]' \
+		'server_name = "OpenTTD iOS M14 Test"' \
+		'server_advertise = false' \
+		'' \
+		'[version]' \
+		'ini_version = 8' > "$server_config"
+	printf '%s\n' \
+		'[gui]' \
+		'missing_strings_threshold = 255' \
+		'' \
+		'[version]' \
+		'ini_version = 8' > "$client_config"
+	# With -c, OpenTTD still reads private.cfg (the client name) from Documents.
+	local private_file="$container/Documents/private.cfg"
+	if [[ -e "$private_file" ]]; then
+		mv -- "$private_file" "$MULTIPLAYER_CLIENT_DIRECTORY/user-private.cfg"
+	fi
+	MULTIPLAYER_PRIVATE_WRITTEN=yes
+	printf '%s\n' \
+		'[network]' \
+		'client_name = "iOS M14 Client"' \
+		'participate_survey = no' \
+		'use_relay_service = never' \
+		'' \
+		'[version]' \
+		'ini_version = 8' > "$private_file"
+
+	mkdir -p "$LOG_DIR"
+	"$HOST_TESTS/openttd" -D "0.0.0.0:$port" -g -x -c "$server_config" -d net=9 \
+		< /dev/null > "$LOG_DIR/multiplayer-server.log" 2>&1 &
+	MULTIPLAYER_SERVER_PID=$!
+	wait_for_text "$LOG_DIR/multiplayer-server.log" 'Map generated, starting game' 30 "$MULTIPLAYER_SERVER_PID" || \
+		fail "the temporary multiplayer server did not start within 30 seconds"
+
+	"$BUILD" run --simulator "$simulator_name" --seconds 45 --label multiplayer -- \
+		-c "$client_config" -n "$host_address:$port" -s ios -S OpenSFX -M OpenMSX -d driver=1,misc=1,net=9 || \
+		fail "the multiplayer client run failed; see log/debugger.log"
+	cleanup_multiplayer
+	trap - EXIT INT TERM
+
+	local client_log="$LOG_DIR/debugger.log"
+	local server_log="$LOG_DIR/multiplayer-server.log"
+	grep -Fq 'Client::ReceiveServerMapBegin()' "$client_log" || fail "multiplayer map transfer did not begin"
+	grep -Fq 'Client::ReceiveServerMapDone()' "$client_log" || fail "multiplayer map transfer did not complete"
+	grep -Fq 'Client::status = ACTIVE' "$client_log" || fail "multiplayer client did not become active"
+	local sync_count
+	sync_count="$(grep -Fc 'Client::ReceiveServerSync()' "$client_log" || true)"
+	(( sync_count >= 3 )) || fail "multiplayer client received fewer than three synchronization packets"
+	! grep -Fiq 'sync error' "$client_log" || fail "multiplayer client reported a synchronization error"
+	grep -Fq 'joined as iOS M14 Client' "$server_log" || fail "temporary server did not register the iOS client"
+	echo "Multiplayer smoke test passed: map transfer and $sync_count sync packets in 45 s; evidence is in log/debugger.log and log/multiplayer*"
+}
+
 command="${1:-}"
 case "$command" in
 	""|-h|--help)
@@ -238,13 +369,13 @@ case "$command" in
 		[[ $# -eq 1 ]] || usage_error "$command takes no arguments"
 		"smoke_$command"
 		;;
-	app)
+	app|multiplayer)
 		shift
 		for argument in "$@"; do
 			[[ "$argument" != -h && "$argument" != --help ]] || { usage; exit 0; }
 		done
 		require_tool xcrun
-		smoke_app "$@"
+		"smoke_$command" "$@"
 		;;
 	*)
 		usage >&2

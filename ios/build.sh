@@ -392,6 +392,10 @@ build_engine_slice()
 	archive="$(cmake_tree "$sdk")/libopenttd_engine.a"
 	[[ -f "$archive" ]] || fail "$sdk engine archive was not produced"
 	lipo -info "$archive" | grep -q 'arm64' || fail "$sdk engine archive is not arm64"
+	local archive_members
+	archive_members="$(xcrun ar -t "$archive")"
+	grep -Fq 'http_nsurlsession.mm.o' <<< "$archive_members" || fail "$sdk engine does not contain the NSURLSession HTTP backend"
+	! grep -Eq 'http_(none|curl)\.cpp\.o' <<< "$archive_members" || fail "$sdk engine contains a non-iOS HTTP backend"
 }
 
 # Packages every current engine slice of the selected configuration with the public
