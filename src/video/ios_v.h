@@ -49,6 +49,7 @@ private:
 	bool UpdateLayout(bool force);
 	void HandleLifecycleEvent(Uint32 event_type);
 	void SaveForBackground();
+	void RecordFrame(Uint64 start, Uint64 upload_start, Uint64 present_start, Uint64 end, int pixels);
 	OpenTTDIOSInput::LogicalPoint GetLogicalPoint(float x, float y) const;
 	void MoveCursor(const OpenTTDIOSInput::LogicalPoint &point, bool dispatch = true);
 	void HandleMouseMotion(const SDL_MouseMotionEvent &event);
@@ -60,6 +61,16 @@ private:
 	void UpdateTextInputArea();
 	void CancelTouchInput();
 
+	struct FrameStats {
+		Uint64 since = 0;
+		Uint64 palette = 0;
+		Uint64 upload = 0;
+		Uint64 present = 0;
+		Uint64 present_max = 0;
+		uint64_t pixels = 0;
+		int frames = 0;
+	};
+
 	SDL_Window *window = nullptr;
 	SDL_Renderer *renderer = nullptr;
 	SDL_Texture *texture = nullptr;
@@ -70,6 +81,7 @@ private:
 	std::string startup_error{};
 	OpenTTDIOSInput::GestureState touch_gesture{};
 	OpenTTDIOSInput::PinchAccumulator pinch_gesture{};
+	FrameStats frame_stats{};
 	SDL_Rect text_input_area{};
 	int window_width = 0;
 	int window_height = 0;

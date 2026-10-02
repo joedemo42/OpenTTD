@@ -697,6 +697,7 @@ void VideoDriver_iOS::Paint()
 	if (this->backgrounded) return;
 	if (this->redraw_requested.exchange(false)) this->MakeDirty(0, 0, _screen.width, _screen.height);
 
+	const Uint64 paint_start = SDL_GetTicksNS();
 	if (this->local_palette.count_dirty != 0) {
 		Blitter *blitter = BlitterFactory::GetCurrentBlitter();
 		if (blitter->UsePaletteAnimation() == Blitter::PaletteAnimation::Blitter) {
@@ -722,11 +723,13 @@ void VideoDriver_iOS::Paint()
 		return;
 	}
 
+	const Uint64 upload_start = SDL_GetTicksNS();
 	const uint32_t *pixels = this->framebuffer.data() + static_cast<size_t>(update.y) * _screen.pitch + update.x;
 	if (!SDL_UpdateTexture(this->texture, &update, pixels, _screen.pitch * sizeof(uint32_t))) {
 		Debug(driver, 0, "iOS: dirty texture upload failed: {}", SDL_GetError());
 		return;
 	}
+	const Uint64 present_start = SDL_GetTicksNS();
 
 	SDL_SetRenderDrawColor(this->renderer, 0, 0, 0, 255);
 	SDL_RenderClear(this->renderer);
@@ -738,6 +741,7 @@ void VideoDriver_iOS::Paint()
 		Debug(driver, 0, "iOS: Metal presentation failed: {}", SDL_GetError());
 		return;
 	}
+	this->RecordFrame(paint_start, upload_start, present_start, SDL_GetTicksNS(), update.w * update.h);
 
 	if (!this->logged_first_present) {
 		SDL_Log("IOS_VIDEO PRESENT first_dirty=%d,%d %dx%d", update.x, update.y, update.w, update.h);
@@ -749,6 +753,28 @@ void VideoDriver_iOS::Paint()
 		this->logged_gui_scale = _gui_scale;
 	}
 	this->dirty_rect = {};
+}
+
+/** Frame statistics for profiling, logged every 10 seconds with -d driver=2. All times in nanoseconds. */
+void VideoDriver_iOS::RecordFrame(Uint64 start, Uint64 upload_start, Uint64 present_start, Uint64 end, int pixels)
+{
+	if (_debug_driver_level < 2) return;
+
+	FrameStats &stats = this->frame_stats;
+	if (stats.since == 0) stats.since = start;
+	stats.frames++;
+	stats.pixels += pixels;
+	stats.palette += upload_start - start;
+	stats.upload += present_start - upload_start;
+	stats.present += end - present_start;
+	stats.present_max = std::max(stats.present_max, end - present_start);
+	if (end - stats.since < SDL_NS_PER_SECOND * 10) return;
+
+	const double frames = stats.frames;
+	Debug(driver, 2, "iOS video: {:.1f} presents/s; per present: palette {:.2f} ms, upload {:.2f} ms, present {:.2f} ms (max {:.2f}), {:.2f} Mpixels",
+			frames * SDL_NS_PER_SECOND / (end - stats.since), stats.palette / frames / SDL_NS_PER_MS, stats.upload / frames / SDL_NS_PER_MS,
+			stats.present / frames / SDL_NS_PER_MS, static_cast<double>(stats.present_max) / SDL_NS_PER_MS, stats.pixels / frames / 1e6);
+	stats = {};
 }
 
 bool VideoDriver_iOS::UpdateLayout(bool force)
