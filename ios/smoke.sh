@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Non-interactive checks of the OpenTTD iOS port: host tests, Documents payload, app runtime markers.
+# Non-interactive checks of the OpenTTD iOS port: host tests, Documents payload, app runtime markers, lifecycle.
 
 set -euo pipefail
 
@@ -38,6 +38,9 @@ app   [simulator|device] [--simulator <name|UDID> | --device <name|UDID>] [--sec
       Uses the installed current build; simulator runs ≥ 15 s add a background/foreground cycle.
 multiplayer [--simulator <name|UDID>] [--host <address>]
       A simulator client joins a temporary same-revision host server: map transfer and sync for 45 s.
+lifecycle [--simulator <name|UDID>]
+      New game → background → SIGKILL: autosave and a changed setting persist and load. SIGSEGV writes
+      OpenTTD's crash log, savegame and screenshot plus the system .ips; the crash savegame loads. ~2 min
 EOF
 }
 
@@ -359,6 +362,138 @@ smoke_multiplayer()
 	echo "Multiplayer smoke test passed: map transfer and $sync_count sync packets in 45 s; evidence is in log/debugger.log and log/multiplayer*"
 }
 
+LIFECYCLE_DIRECTORY=""
+
+cleanup_lifecycle()
+{
+	if [[ "$LIFECYCLE_DIRECTORY" == */Documents/.m15-lifecycle-test.* ]]; then
+		rm -rf -- "$LIFECYCLE_DIRECTORY"
+	fi
+	LIFECYCLE_DIRECTORY=""
+}
+
+# PID of the app process of the current run.
+run_app_pid()
+{
+	sed -nE 's/.*OpenTTD\[([0-9]+):.*/\1/p' "$LOG_DIR/debugger.log" | head -n 1
+}
+
+# start_lifecycle_run <label> <seconds> <app arguments ...>: sets RUN_PID; output → log/<label>.out.
+RUN_PID=""
+start_lifecycle_run()
+{
+	local label="$1" seconds="$2"
+	shift 2
+	: > "$LOG_DIR/debugger.log"
+	"$BUILD" run --simulator "$LIFECYCLE_SIMULATOR_NAME" --seconds "$seconds" --label "$label" -- "$@" \
+		> "$LOG_DIR/$label.out" 2>&1 &
+	RUN_PID=$!
+	wait_for_text "$LOG_DIR/debugger.log" 'IOS_VIDEO PRESENT first_dirty=' 30 "$RUN_PID" || \
+		fail "$label: OpenTTD did not draw within 30 s; see log/$label.out"
+}
+
+# The game in <file> loaded after the title game, which is a savegame as well.
+require_loaded()
+{
+	(( $(grep -c 'Loading savegame version' "$LOG_DIR/debugger.log" || true) >= 2 )) && \
+		! grep -Fq '[sl:0]' "$LOG_DIR/debugger.log" || fail "$1 was not loaded; see log/debugger.log"
+}
+
+# Launching another app moves OpenTTD to the background; waits for its background save.
+background_save()
+{
+	xcrun simctl launch "$1" com.apple.Preferences >/dev/null
+	wait_for_text "$LOG_DIR/debugger.log" 'IOS_VIDEO LIFECYCLE saved ' 30 "$RUN_PID" || \
+		fail "OpenTTD did not save within 30 s of entering the background"
+	grep -Fq 'IOS_VIDEO LIFECYCLE saved game=yes config=yes' "$LOG_DIR/debugger.log" || \
+		fail "the background save did not include the game and configuration"
+}
+
+LIFECYCLE_SIMULATOR_NAME="$DEFAULT_SIMULATOR"
+
+# Background save and crash logging, as iOS ends apps: SIGKILL while suspended, or a crash signal.
+smoke_lifecycle()
+{
+	while [[ $# -gt 0 ]]; do
+		case "$1" in
+			--simulator)
+				[[ $# -ge 2 ]] || usage_error "$1 needs a value"
+				LIFECYCLE_SIMULATOR_NAME="$2"
+				shift 2
+				;;
+			*) usage_error "lifecycle does not take $1" ;;
+		esac
+	done
+	local simulator container
+	simulator="$(resolve_simulator "$LIFECYCLE_SIMULATOR_NAME")"
+	container="$(xcrun simctl get_app_container "$simulator" "$BUNDLE_ID" data 2>/dev/null)" || \
+		fail "OpenTTD is not installed on $LIFECYCLE_SIMULATOR_NAME"
+	local documents="$container/Documents"
+	mkdir -p "$LOG_DIR"
+	trap cleanup_lifecycle EXIT INT TERM
+	LIFECYCLE_DIRECTORY="$(mktemp -d "$documents/.m15-lifecycle-test.XXXXXX")"
+	# An isolated configuration; -t 1977 changes game_creation.starting_year in it.
+	local config="$LIFECYCLE_DIRECTORY/openttd.cfg"
+	printf '%s\n' '[gui]' 'missing_strings_threshold = 255' '' '[version]' 'ini_version = 8' > "$config"
+	touch "$LIFECYCLE_DIRECTORY/start"
+
+	# 1. A new game is saved when the app enters the background, which iOS then kills.
+	start_lifecycle_run lifecycle-save 45 -c "$config" -g -G 15 -t 1977 -d sl=2
+	sleep 10
+	background_save "$simulator"
+	kill -KILL "$(run_app_pid)"
+	wait "$RUN_PID" || true
+	cp "$LOG_DIR/debugger.log" "$LOG_DIR/lifecycle-save-debugger.log"
+	local autosave
+	autosave="$(sed -nE "s/.*Autosaving to '([^']+)'.*/\1/p" "$LOG_DIR/debugger.log" | tail -n 1)"
+	[[ -n "$autosave" && "$documents/save/autosave/$autosave" -nt "$LIFECYCLE_DIRECTORY/start" ]] || \
+		fail "the background autosave was not written"
+	grep -Eq '^starting_year = 1977$' "$config" || fail "the changed setting was not saved"
+
+	# 2. The autosave loads. SIGSEGV writes OpenTTD's crash files and, re-raised, the system crash report.
+	start_lifecycle_run lifecycle-crash 45 -c "$config" -g "$documents/save/autosave/$autosave" -d sl=1
+	sleep 5
+	require_loaded "the autosave"
+	touch "$LIFECYCLE_DIRECTORY/crash"
+	kill -SEGV "$(run_app_pid)"
+	wait "$RUN_PID" || true
+	cp "$LOG_DIR/debugger.log" "$LOG_DIR/lifecycle-crash-debugger.log"
+	grep -Fq 'Crash encountered, generating crash log' "$LOG_DIR/debugger.log" || fail "the crash handler did not run"
+	local crash_log
+	crash_log="$(find "$documents" -maxdepth 1 -name 'crash*.json.log' -newer "$LIFECYCLE_DIRECTORY/crash" | head -n 1)"
+	[[ -n "$crash_log" ]] || fail "no crash log was written to Documents"
+	local crash="${crash_log%.json.log}"
+	grep -Fq '"reason": "Segmentation fault: 11"' "$crash_log" || fail "the crash log does not record SIGSEGV"
+	[[ -s "$crash.sav" ]] || fail "no crash savegame was written"
+	[[ -s "$crash.png" ]] || fail "no crash screenshot was written"
+	local report="" waited=0
+	while [[ -z "$report" ]] && (( waited < 20 )); do
+		sleep 1
+		waited=$((waited + 1))
+		report="$(find "$HOME/Library/Logs/DiagnosticReports" -maxdepth 1 -name 'OpenTTD-*.ips' \
+			-newer "$LIFECYCLE_DIRECTORY/crash" | head -n 1)"
+	done
+	[[ -n "$report" ]] || fail "iOS wrote no crash report"
+	grep -Eq '"signal" ?: ?"SIGSEGV"' "$report" || fail "the system crash report does not record SIGSEGV"
+
+	# 3. The crash savegame loads and the game runs: entering the background saves it again.
+	start_lifecycle_run lifecycle-crashsave 30 -c "$config" -g "$crash.sav" -d sl=1
+	sleep 5
+	require_loaded "the crash savegame"
+	background_save "$simulator"
+	xcrun simctl launch "$simulator" "$BUNDLE_ID" >/dev/null
+	wait "$RUN_PID" || fail "OpenTTD did not keep running the crash savegame; see log/lifecycle-crashsave.out"
+
+	rm -rf "$LOG_DIR/lifecycle-crash"
+	mkdir -p "$LOG_DIR/lifecycle-crash"
+	mv "$crash.json.log" "$crash.sav" "$crash.png" "$LOG_DIR/lifecycle-crash/"
+	cp "$report" "$LOG_DIR/lifecycle-crash/"
+	cleanup_lifecycle
+	trap - EXIT INT TERM
+	echo "Lifecycle smoke test passed: background save ($autosave, setting), crash files and ${report##*/}, crash savegame;" \
+		"evidence is in log/lifecycle-*"
+}
+
 command="${1:-}"
 case "$command" in
 	""|-h|--help)
@@ -369,7 +504,7 @@ case "$command" in
 		[[ $# -eq 1 ]] || usage_error "$command takes no arguments"
 		"smoke_$command"
 		;;
-	app|multiplayer)
+	app|multiplayer|lifecycle)
 		shift
 		for argument in "$@"; do
 			[[ "$argument" != -h && "$argument" != --help ]] || { usage; exit 0; }
