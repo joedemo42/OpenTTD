@@ -311,12 +311,7 @@ void VideoDriver_iOS::InputLoop()
 
 OpenTTDIOSInput::LogicalPoint VideoDriver_iOS::GetLogicalPoint(float x, float y) const
 {
-	return OpenTTDIOSInput::TranslateWindowPoint(x, y, this->safe_x, this->safe_y, _screen.width, _screen.height);
-}
-
-OpenTTDIOSInput::LogicalPoint VideoDriver_iOS::GetLogicalTouchPoint(float x, float y) const
-{
-	return this->GetLogicalPoint(x * this->window_width, y * this->window_height);
+	return OpenTTDIOSInput::TranslateWindowPoint(x * this->scale_x, y * this->scale_y, this->safe_x, this->safe_y, _screen.width, _screen.height);
 }
 
 void VideoDriver_iOS::MoveCursor(const OpenTTDIOSInput::LogicalPoint &point, bool dispatch)
@@ -331,7 +326,7 @@ void VideoDriver_iOS::HandleMouseMotion(const SDL_MouseMotionEvent &event)
 	const OpenTTDIOSInput::LogicalPoint point = this->GetLogicalPoint(event.x, event.y);
 	_cursor.in_window = point.inside;
 	if (_cursor.fix_at) {
-		_cursor.UpdateCursorPositionRelative(static_cast<int>(std::lround(event.xrel)), static_cast<int>(std::lround(event.yrel)));
+		_cursor.UpdateCursorPositionRelative(static_cast<int>(std::lround(event.xrel * this->scale_x)), static_cast<int>(std::lround(event.yrel * this->scale_y)));
 	} else {
 		_cursor.UpdateCursorPosition(point.x, point.y);
 	}
@@ -380,8 +375,8 @@ void VideoDriver_iOS::HandleMouseWheel(const SDL_MouseWheelEvent &event)
 	}
 
 	constexpr float SCROLL_BUILTIN_MULTIPLIER = 14.0f;
-	_cursor.v_wheel -= y * SCROLL_BUILTIN_MULTIPLIER * _settings_client.gui.scrollwheel_multiplier;
-	_cursor.h_wheel += x * SCROLL_BUILTIN_MULTIPLIER * _settings_client.gui.scrollwheel_multiplier;
+	_cursor.v_wheel -= y * this->scale_y * SCROLL_BUILTIN_MULTIPLIER * _settings_client.gui.scrollwheel_multiplier;
+	_cursor.h_wheel += x * this->scale_x * SCROLL_BUILTIN_MULTIPLIER * _settings_client.gui.scrollwheel_multiplier;
 	_cursor.wheel_moved = x != 0 || y != 0;
 	SDL_Log("IOS_INPUT POINTER wheel=%.3f,%.3f", x, y);
 }
@@ -396,14 +391,16 @@ void VideoDriver_iOS::HandleKeyDown(const SDL_KeyboardEvent &event)
 
 void VideoDriver_iOS::HandleTouch(const SDL_TouchFingerEvent &event)
 {
-	OpenTTDIOSInput::LogicalPoint point = this->GetLogicalTouchPoint(event.x, event.y);
+	/* Gestures track window points, so their thresholds do not depend on the display's pixel density. */
+	const float x = event.x * this->window_width;
+	const float y = event.y * this->window_height;
 	OpenTTDIOSInput::GestureActions actions;
 
 	switch (event.type) {
 		case SDL_EVENT_FINGER_DOWN: {
-			if (!point.inside) return;
+			if (!this->GetLogicalPoint(x, y).inside) return;
 			const size_t previous_count = this->touch_gesture.ActiveCount();
-			actions = this->touch_gesture.FingerDown(event.fingerID, point.x, point.y, event.timestamp);
+			actions = this->touch_gesture.FingerDown(event.fingerID, x, y, event.timestamp);
 			if (previous_count == 1 && this->touch_gesture.ActiveCount() == 2) {
 				this->touch_pan_remainder_x = 0;
 				this->touch_pan_remainder_y = 0;
@@ -413,12 +410,12 @@ void VideoDriver_iOS::HandleTouch(const SDL_TouchFingerEvent &event)
 		}
 
 		case SDL_EVENT_FINGER_MOTION:
-			actions = this->touch_gesture.FingerMotion(event.fingerID, point.x, point.y);
+			actions = this->touch_gesture.FingerMotion(event.fingerID, x, y);
 			break;
 
 		case SDL_EVENT_FINGER_UP:
 		case SDL_EVENT_FINGER_CANCELED:
-			actions = this->touch_gesture.FingerUp(event.fingerID, point.x, point.y,
+			actions = this->touch_gesture.FingerUp(event.fingerID, x, y,
 					event.type == SDL_EVENT_FINGER_CANCELED);
 			break;
 
@@ -434,11 +431,8 @@ void VideoDriver_iOS::HandleGestureActions(const OpenTTDIOSInput::GestureActions
 	using OpenTTDIOSInput::GestureActionType;
 	for (size_t index = 0; index < actions.size; ++index) {
 		const OpenTTDIOSInput::GestureAction &action = actions.items[index];
-		const OpenTTDIOSInput::LogicalPoint point{
-			std::clamp(static_cast<int>(std::lround(action.x)), 0, _screen.width - 1),
-			std::clamp(static_cast<int>(std::lround(action.y)), 0, _screen.height - 1),
-			true,
-		};
+		OpenTTDIOSInput::LogicalPoint point = this->GetLogicalPoint(action.x, action.y);
+		point.inside = true;
 
 		switch (action.type) {
 			case GestureActionType::PointerMove:
@@ -465,7 +459,7 @@ void VideoDriver_iOS::HandleGestureActions(const OpenTTDIOSInput::GestureActions
 			case GestureActionType::DragMove:
 			case GestureActionType::LongPressMove:
 				if (_cursor.fix_at) {
-					_cursor.UpdateCursorPositionRelative(static_cast<int>(std::lround(action.dx)), static_cast<int>(std::lround(action.dy)));
+					_cursor.UpdateCursorPositionRelative(static_cast<int>(std::lround(action.dx * this->scale_x)), static_cast<int>(std::lround(action.dy * this->scale_y)));
 					HandleMouseEvents();
 				} else {
 					this->MoveCursor(point);
@@ -497,8 +491,8 @@ void VideoDriver_iOS::HandleGestureActions(const OpenTTDIOSInput::GestureActions
 
 			case GestureActionType::Pan: {
 				this->MoveCursor(point, false);
-				this->touch_pan_remainder_x -= action.dx;
-				this->touch_pan_remainder_y -= action.dy;
+				this->touch_pan_remainder_x -= action.dx * this->scale_x;
+				this->touch_pan_remainder_y -= action.dy * this->scale_y;
 				const int dx = static_cast<int>(this->touch_pan_remainder_x);
 				const int dy = static_cast<int>(this->touch_pan_remainder_y);
 				this->touch_pan_remainder_x -= dx;
@@ -521,23 +515,20 @@ void VideoDriver_iOS::UpdateTextInputArea()
 {
 	if (this->window == nullptr || !EditBoxInGlobalFocus() || _focused_window == nullptr) return;
 
+	/* OpenTTD positions are drawable pixels inside the safe area; SDL expects window points. */
+	const auto to_window_x = [this](int x) { return static_cast<int>(std::lround((this->safe_x + _focused_window->left + x) / this->scale_x)); };
+	const auto to_window_y = [this](int y) { return static_cast<int>(std::lround((this->safe_y + _focused_window->top + y) / this->scale_y)); };
+
 	const Point caret = _focused_window->GetCaretPosition();
-	SDL_Rect area{
-		this->safe_x + _focused_window->left + caret.x,
-		this->safe_y + _focused_window->top + caret.y,
-		1,
-		24,
-	};
+	SDL_Rect area{to_window_x(caret.x), to_window_y(caret.y), 1, 24};
 	if (_focused_window->nested_focus != nullptr && _focused_window->nested_focus->type == WWT_EDITBOX) {
 		const Rect widget = _focused_window->nested_focus->GetCurrentRect();
-		area = {
-			this->safe_x + _focused_window->left + widget.left,
-			this->safe_y + _focused_window->top + widget.top,
-			widget.Width(),
-			widget.Height(),
-		};
+		area.x = to_window_x(widget.left);
+		area.y = to_window_y(widget.top);
+		area.w = to_window_x(widget.right + 1) - area.x;
+		area.h = to_window_y(widget.bottom + 1) - area.y;
 	}
-	const int cursor = std::clamp(this->safe_x + _focused_window->left + caret.x - area.x, 0, area.w);
+	const int cursor = std::clamp(to_window_x(caret.x) - area.x, 0, area.w);
 	if (this->text_input_area_valid && area.x == this->text_input_area.x && area.y == this->text_input_area.y &&
 			area.w == this->text_input_area.w && area.h == this->text_input_area.h && cursor == this->text_input_cursor) return;
 
@@ -573,6 +564,7 @@ bool VideoDriver_iOS::PollEvent()
 
 		case SDL_EVENT_WINDOW_RESIZED:
 		case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+		case SDL_EVENT_WINDOW_METAL_VIEW_RESIZED:
 		case SDL_EVENT_WINDOW_SAFE_AREA_CHANGED:
 			this->CancelTouchInput();
 			if (!this->UpdateLayout(false)) Debug(driver, 0, "iOS: failed to update window layout: {}", SDL_GetError());
@@ -740,19 +732,28 @@ bool VideoDriver_iOS::UpdateLayout(bool force)
 	int new_window_height = 0;
 	if (!SDL_GetWindowSize(this->window, &new_window_width, &new_window_height)) return false;
 
-	SDL_Rect safe{0, 0, new_window_width, new_window_height};
-	if (!SDL_GetWindowSafeArea(this->window, &safe)) SDL_ClearError();
-	if (new_window_width <= 0 || new_window_height <= 0) return false;
-	safe.x = std::clamp(safe.x, 0, new_window_width - 1);
-	safe.y = std::clamp(safe.y, 0, new_window_height - 1);
-	safe.w = std::clamp(safe.w, 1, new_window_width - safe.x);
-	safe.h = std::clamp(safe.h, 1, new_window_height - safe.y);
+	int output_width = 0;
+	int output_height = 0;
+	if (!SDL_GetRenderOutputSize(this->renderer, &output_width, &output_height)) return false;
+	if (new_window_width <= 0 || new_window_height <= 0 || output_width <= 0 || output_height <= 0) return false;
 
-	if (!SDL_SetRenderLogicalPresentation(this->renderer, new_window_width, new_window_height, SDL_LOGICAL_PRESENTATION_STRETCH)) return false;
+	/* OpenTTD draws in drawable pixels and presents them 1:1, so text is rasterized at the display's resolution.
+	 * Its automatic interface scale follows the pixel size. */
+	const float new_scale_x = static_cast<float>(output_width) / new_window_width;
+	const float new_scale_y = static_cast<float>(output_height) / new_window_height;
+	SDL_Rect safe_points{0, 0, new_window_width, new_window_height};
+	if (!SDL_GetWindowSafeArea(this->window, &safe_points)) SDL_ClearError();
+	const int left = std::clamp(static_cast<int>(std::lround(safe_points.x * new_scale_x)), 0, output_width - 1);
+	const int top = std::clamp(static_cast<int>(std::lround(safe_points.y * new_scale_y)), 0, output_height - 1);
+	const int right = std::clamp(static_cast<int>(std::lround((safe_points.x + safe_points.w) * new_scale_x)), left + 1, output_width);
+	const int bottom = std::clamp(static_cast<int>(std::lround((safe_points.y + safe_points.h) * new_scale_y)), top + 1, output_height);
+	const SDL_Rect safe{left, top, right - left, bottom - top};
 
 	const bool size_changed = safe.w != _screen.width || safe.h != _screen.height;
 	this->window_width = new_window_width;
 	this->window_height = new_window_height;
+	this->scale_x = new_scale_x;
+	this->scale_y = new_scale_y;
 	this->safe_x = safe.x;
 	this->safe_y = safe.y;
 	if (!force && !size_changed) return true;
@@ -780,8 +781,8 @@ bool VideoDriver_iOS::UpdateLayout(bool force)
 	BlitterFactory::GetCurrentBlitter()->PostResize();
 	GameSizeChanged();
 	const SDL_DisplayMode *display = SDL_GetDesktopDisplayMode(SDL_GetDisplayForWindow(this->window));
-	SDL_Log("IOS_VIDEO LAYOUT window=%dx%d safe=%d,%d %dx%d display=%dx%d", new_window_width, new_window_height,
-			safe.x, safe.y, safe.w, safe.h, display != nullptr ? display->w : 0, display != nullptr ? display->h : 0);
+	SDL_Log("IOS_VIDEO LAYOUT window=%dx%d output=%dx%d safe=%d,%d %dx%d display=%dx%d", new_window_width, new_window_height,
+			output_width, output_height, safe.x, safe.y, safe.w, safe.h, display != nullptr ? display->w : 0, display != nullptr ? display->h : 0);
 	return true;
 }
 

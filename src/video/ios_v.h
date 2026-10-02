@@ -48,7 +48,6 @@ private:
 	bool UpdateLayout(bool force);
 	void HandleLifecycleEvent(Uint32 event_type);
 	OpenTTDIOSInput::LogicalPoint GetLogicalPoint(float x, float y) const;
-	OpenTTDIOSInput::LogicalPoint GetLogicalTouchPoint(float x, float y) const;
 	void MoveCursor(const OpenTTDIOSInput::LogicalPoint &point, bool dispatch = true);
 	void HandleMouseMotion(const SDL_MouseMotionEvent &event);
 	void HandleMouseButton(const SDL_MouseButtonEvent &event);
@@ -72,6 +71,8 @@ private:
 	SDL_Rect text_input_area{};
 	int window_width = 0;
 	int window_height = 0;
+	float scale_x = 1.0f;
+	float scale_y = 1.0f;
 	int safe_x = 0;
 	int safe_y = 0;
 	int text_input_cursor = 0;
