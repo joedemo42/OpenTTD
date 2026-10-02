@@ -1,5 +1,9 @@
 add_files(
     crashlog_unix.cpp
+    CONDITION UNIX AND (NOT APPLE OR IOS)
+)
+
+add_files(
     survey_unix.cpp
     CONDITION UNIX AND NOT APPLE
 )

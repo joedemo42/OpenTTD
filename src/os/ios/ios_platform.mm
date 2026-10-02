@@ -12,7 +12,6 @@
 #import <Foundation/Foundation.h>
 #import <UIKit/UIKit.h>
 
-#include "../../crashlog.h"
 #include "../../debug.h"
 #include "../../fios.h"
 #include "../../library_loader.h"
@@ -181,13 +180,4 @@ void *LibraryLoader::GetSymbol(const std::string &)
 {
 	this->error = "Dynamic loading is not supported on iOS.";
 	return nullptr;
-}
-
-/* ponytail: Milestone 15 adds an iOS crash-reporting strategy. */
-void CrashLog::InitialiseCrashLog()
-{
-}
-
-void CrashLog::InitThread()
-{
 }

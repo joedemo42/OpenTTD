@@ -18,8 +18,8 @@
 #include <signal.h>
 #include <sys/utsname.h>
 
-#if defined(__GLIBC__)
-/* Execinfo (and thus making stacktraces) is a GNU extension */
+#if defined(__GLIBC__) || defined(__APPLE__)
+/* Execinfo (and thus making stacktraces) is a GNU extension, which Apple platforms provide too. */
 #	include <execinfo.h>
 #endif
 
@@ -55,7 +55,7 @@ class CrashLogUnix : public CrashLog {
 
 	void SurveyStacktrace([[maybe_unused]] nlohmann::json &survey) const override
 	{
-#if defined(__GLIBC__)
+#if defined(__GLIBC__) || defined(__APPLE__)
 		void *trace[64];
 		int trace_size = backtrace(trace, lengthof(trace));
 
@@ -208,6 +208,12 @@ static void CDECL HandleCrash(int signum)
 	CrashLogUnix *log = new CrashLogUnix(signum);
 	CrashLogUnix::current = log;
 	log->MakeCrashLog();
+
+#if defined(__APPLE__)
+	/* iOS has no display state to restore. Die by the original signal, so the system crash report is written as well. */
+	signal(signum, SIG_DFL);
+	raise(signum);
+#endif
 
 	CrashLog::AfterCrashLogCleanup();
 	_exit(2);
