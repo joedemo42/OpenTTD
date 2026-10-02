@@ -58,6 +58,9 @@ targets:
       - path: ../DerivedData/DataPackage/SeedData
         type: folder
         buildPhase: resources
+      - path: ../DerivedData/DataPackage/Manual
+        type: folder
+        buildPhase: resources
     settings:
       base:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

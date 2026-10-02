@@ -24,6 +24,8 @@ ENGINE_XCFRAMEWORK="$ENGINE_ROOT/OpenTTDEngine.xcframework"
 ENGINE_CONFIG_TAG="documents-root-v1|sdl3-metal-video-v1"
 DATA_STAGE="$DERIVED_DATA/DataPackage"
 SEED_DATA="$DATA_STAGE/SeedData"
+# Vendored third-party code linked into the engine: <directory in src/3rdparty>:<license file>.
+VENDORED_LICENSES="fmt:LICENSE.rst monocypher:LICENCE.md nlohmann:LICENSE.MIT openttd_social_integration_api:LICENSE squirrel:COPYRIGHT"
 IPA_DIR="$DERIVED_DATA/ipa"
 REPO_SERVER_URL="http://repo-server.invalid/upload/"
 
@@ -290,7 +292,7 @@ require_current_build()
 	find_current_build "$1" || fail "no current $1 build; run: $(script_name) build $1$RELEASE_OPTION"
 }
 
-# Builds only XCFrameworks or slices that are missing; existing artifacts are reused.
+# Builds only XCFrameworks, slices or license texts that are missing; existing artifacts are reused.
 ensure_deps()
 {
 	local entry framework sdk
@@ -300,6 +302,9 @@ ensure_deps()
 		for sdk in "$@"; do
 			has_slice "$framework" "$sdk" || missing+=("$sdk")
 		done
+		if [[ ${#missing[@]} -eq 0 && -z "$(ls -A "$DEPS_ARTIFACTS/licenses/${entry%%:*}" 2>/dev/null)" ]]; then
+			missing=("$@")
+		fi
 		if [[ ${#missing[@]} -gt 0 ]]; then
 			"$DEPS_SCRIPT" build "${entry%%:*}" "$(target_word "${missing[@]}")"
 		fi
@@ -431,18 +436,49 @@ package_engine()
 	echo "Created $ENGINE_XCFRAMEWORK"
 }
 
+# Stages the read-only Manual bundled next to SeedData: the documents the Help window
+# shows and the license texts of everything linked or bundled into the app.
+stage_manual()
+{
+	local manual="$1"
+	mkdir -p "$manual/docs" "$manual/licenses/md5" "$manual/licenses/timgm6mb"
+	cp "$SOURCE_DIR/README.md" "$SOURCE_DIR/COPYING.md" "$SOURCE_DIR/changelog.md" "$SOURCE_DIR/known-bugs.md" "$manual/"
+	cp "$SOURCE_DIR/docs/fonts.md" "$manual/docs/"
+	local dependency entry
+	for dependency in sdl3 zlib xz libpng lzo; do
+		cp -R "$DEPS_ARTIFACTS/licenses/$dependency" "$manual/licenses/"
+	done
+	cp "$DEPS_ARTIFACTS/TimGM6mb/LICENSE.txt" "$DEPS_ARTIFACTS/TimGM6mb/COPYING.md" "$manual/licenses/timgm6mb/"
+	for entry in $VENDORED_LICENSES; do
+		mkdir -p "$manual/licenses/${entry%%:*}"
+		cp "$SOURCE_DIR/src/3rdparty/${entry%%:*}/${entry#*:}" "$manual/licenses/${entry%%:*}/"
+	done
+	# md5 states its license only in its source comment.
+	sed -n '/Copyright (C) 1999, 2002 Aladdin Enterprises/,/ghost@aladdin.com/p' \
+		"$SOURCE_DIR/src/3rdparty/md5/md5.h" > "$manual/licenses/md5/LICENSE.txt"
+	[[ -s "$manual/licenses/md5/LICENSE.txt" ]] || fail "could not extract the md5 license"
+}
+
 # Stages the Documents payload (bundled as SeedData): pinned base sets as released,
 # expanded OpenMSX, TimGM6mb with its licenses, generated languages, built-in media
 # and AI/GS compatibility scripts. Content-addressed; never a Documents/OpenTTD wrapper.
+# The Manual (stage_manual) is staged with it but stays in the bundle.
 prepare_data()
 {
 	local language_dir
 	language_dir="$(cmake_tree "$1")/lang"
 	[[ -d "$language_dir" ]] || fail "missing generated languages in $language_dir"
 
+	local vendored_licenses=() entry
+	for entry in $VENDORED_LICENSES; do
+		vendored_licenses+=("$SOURCE_DIR/src/3rdparty/${entry%%:*}/${entry#*:}")
+	done
 	local fingerprint
-	fingerprint="documents-root-v1:$(shasum -a 256 \
+	fingerprint="documents-root-v1|manual-v1:$(shasum -a 256 \
 		"$REPO_ROOT"/Data/*.zip \
+		"$SOURCE_DIR/README.md" "$SOURCE_DIR/COPYING.md" "$SOURCE_DIR/changelog.md" "$SOURCE_DIR/known-bugs.md" \
+		"$SOURCE_DIR/docs/fonts.md" "$SOURCE_DIR/src/3rdparty/md5/md5.h" "${vendored_licenses[@]}" \
+		"$DEPS_ARTIFACTS"/licenses/*/* \
 		"$DEPS_ARTIFACTS/TimGM6mb/TimGM6mb.sf2" \
 		"$DEPS_ARTIFACTS/TimGM6mb/LICENSE.txt" \
 		"$DEPS_ARTIFACTS/TimGM6mb/COPYING.md" \
@@ -489,6 +525,7 @@ prepare_data()
 	cp "$language_dir"/*.lng "$seed/lang/"
 	cp "$SOURCE_DIR/bin/ai"/*.nut "$seed/ai/"
 	cp "$SOURCE_DIR/bin/game"/*.nut "$seed/game/"
+	stage_manual "$temporary/Manual"
 	printf '%s\n' "$fingerprint" > "$temporary/data.stamp"
 	rm -rf "$DATA_STAGE"
 	mv "$temporary" "$DATA_STAGE"
@@ -513,6 +550,18 @@ verify_bundled_data()
 	[[ -f "$app/SeedData/baseset/timgm6mb/TimGM6mb.sf2" ]] || fail "built app is missing bundled TimGM6mb"
 	[[ -f "$app/SeedData/baseset/timgm6mb/LICENSE.txt" ]] || fail "built app is missing the TimGM6mb copyright notice"
 	[[ -f "$app/SeedData/baseset/timgm6mb/COPYING.md" ]] || fail "built app is missing the TimGM6mb GPL-2 license"
+	[[ ! -e "$app/SeedData/README.md" ]] || fail "bundled SeedData contains the Manual"
+	local file
+	for file in README.md COPYING.md changelog.md known-bugs.md docs/fonts.md \
+		licenses/sdl3/LICENSE.txt licenses/zlib/LICENSE licenses/xz/COPYING licenses/xz/COPYING.0BSD \
+		licenses/libpng/LICENSE licenses/lzo/COPYING licenses/timgm6mb/LICENSE.txt licenses/timgm6mb/COPYING.md \
+		licenses/md5/LICENSE.txt; do
+		[[ -s "$app/Manual/$file" ]] || fail "built app is missing Manual/$file"
+	done
+	local entry
+	for entry in $VENDORED_LICENSES; do
+		[[ -s "$app/Manual/licenses/${entry%%:*}/${entry#*:}" ]] || fail "built app is missing the ${entry%%:*} license"
+	done
 }
 
 # Generic destinations: compilation never waits for a particular simulator or device.

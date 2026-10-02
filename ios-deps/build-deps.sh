@@ -42,7 +42,7 @@ Usage: $(script_name) <command> [args]
 download   <all|dep>
            (Re-)download the pinned source archive into ios-deps/source/<dep>.
 build      <all|dep> [simulator|device|both]
-           Build static arm64 XCFrameworks into ios-deps/artifacts. Default: both
+           Build static arm64 XCFrameworks and license texts into ios-deps/artifacts. Default: both
            Missing source is downloaded; a missing build dir is extracted and patched.
 clean      <all|dep>
            Remove ios-deps/build/<dep> and the dependency's artifacts.
@@ -75,7 +75,7 @@ require_tool()
 	done
 }
 
-# Sets VERSION, ARCHIVE, URL, SHA256, TOP_DIRECTORY, FRAMEWORK and LIBRARY for one dependency.
+# Sets VERSION, ARCHIVE, URL, SHA256, TOP_DIRECTORY, FRAMEWORK, LIBRARY and LICENSES for one dependency.
 load_dependency()
 {
 	case "$1" in
@@ -87,6 +87,7 @@ load_dependency()
 			TOP_DIRECTORY="SDL3-$VERSION"
 			FRAMEWORK="SDL3"
 			LIBRARY="libSDL3.a"
+			LICENSES="LICENSE.txt"
 			;;
 		zlib)
 			VERSION="1.3.2"
@@ -96,6 +97,7 @@ load_dependency()
 			TOP_DIRECTORY="zlib-$VERSION"
 			FRAMEWORK="Zlib"
 			LIBRARY="libz.a"
+			LICENSES="LICENSE"
 			;;
 		xz)
 			VERSION="5.8.3"
@@ -105,6 +107,7 @@ load_dependency()
 			TOP_DIRECTORY="xz-$VERSION"
 			FRAMEWORK="LibLZMA"
 			LIBRARY="liblzma.a"
+			LICENSES="COPYING COPYING.0BSD"
 			;;
 		libpng)
 			VERSION="1.6.58"
@@ -114,6 +117,7 @@ load_dependency()
 			TOP_DIRECTORY="libpng-$VERSION"
 			FRAMEWORK="LibPNG"
 			LIBRARY="libpng16.a"
+			LICENSES="LICENSE"
 			;;
 		lzo)
 			VERSION="2.10"
@@ -123,6 +127,7 @@ load_dependency()
 			TOP_DIRECTORY="lzo-$VERSION"
 			FRAMEWORK="LZO"
 			LIBRARY="liblzo2.a"
+			LICENSES="COPYING"
 			;;
 		timgm6mb)
 			VERSION="1.3"
@@ -132,6 +137,7 @@ load_dependency()
 			TOP_DIRECTORY="timgm6mb-soundfont_$VERSION"
 			FRAMEWORK=""
 			LIBRARY=""
+			LICENSES=""
 			;;
 		*) return 1 ;;
 	esac
@@ -444,6 +450,19 @@ package_xcframework()
 	echo "Created $output"
 }
 
+# The license texts the app bundle carries: ios-deps/artifacts/licenses/<dep>/.
+stage_licenses()
+{
+	local dependency="$1"
+	local output="$ARTIFACT_ROOT/licenses/$dependency"
+	local file
+	mkdir -p "$output"
+	for file in $LICENSES; do
+		[[ -s "$BUILD_ROOT/$dependency/src/$file" ]] || fail "$dependency license file $file is missing"
+		cmake -E copy_if_different "$BUILD_ROOT/$dependency/src/$file" "$output/$file"
+	done
+}
+
 build_library()
 {
 	local dependency="$1"
@@ -469,6 +488,7 @@ build_library()
 			fail "$dependency $sdk archive is not arm64"
 	done
 	package_xcframework "$dependency"
+	stage_licenses "$dependency"
 	for sdk in "$@"; do
 		probe_sdk "$dependency" "$sdk"
 	done
@@ -536,7 +556,7 @@ build_dependency()
 clean_dependency()
 {
 	load_dependency "$1"
-	rm -rf "$BUILD_ROOT/$1" "$(artifact_path "$1")"
+	rm -rf "$BUILD_ROOT/$1" "$(artifact_path "$1")" "$ARTIFACT_ROOT/licenses/$1"
 	echo "Cleaned $1"
 }
 

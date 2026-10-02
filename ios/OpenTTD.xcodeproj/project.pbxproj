@@ -28,11 +28,13 @@
 		DE3C7F260581561DF058AF0C /* CoreAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CFAB0ECF8D6F694D2CFBE1E2 /* CoreAudio.framework */; };
 		E12D694EC02C9AADC2B08E63 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 33100AC045A8CD5EA732D03A /* CoreGraphics.framework */; };
 		E2E8234D9785D35626CE4BF4 /* CoreMedia.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5F504F695DC5968492C7C08E /* CoreMedia.framework */; };
+		F43E4D2F6AD7CA02C2BA16F8 /* Manual in Resources */ = {isa = PBXBuildFile; fileRef = 2840D3AACFB767C47D0F66E2 /* Manual */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		0948C0C1E819FCB36C18829A /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
 		0CDC5B368BC0EE65287A798C /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
+		2840D3AACFB767C47D0F66E2 /* Manual */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Manual; path = ../DerivedData/DataPackage/Manual; sourceTree = SOURCE_ROOT; };
 		33100AC045A8CD5EA732D03A /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
 		4F2137D0EB8CE86376E5B32F /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 		529CE190AAD443096D95A69E /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
@@ -131,6 +133,7 @@
 		DFF8F242D15A894F14ACAF7C /* DataPackage */ = {
 			isa = PBXGroup;
 			children = (
+				2840D3AACFB767C47D0F66E2 /* Manual */,
 				F6B4F02AA52F2D01E59C091F /* SeedData */,
 			);
 			path = DataPackage;
@@ -223,6 +226,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				B3E9DFD080FA6E56AC42EE91 /* Assets.xcassets in Resources */,
+				F43E4D2F6AD7CA02C2BA16F8 /* Manual in Resources */,
 				6F1B8A53286452D5E8B8906A /* SeedData in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
