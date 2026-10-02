@@ -8,6 +8,9 @@
 /** @file ios_fileio.mm iOS search-path integration. */
 
 #include "../../stdafx.h"
+
+#import <Foundation/Foundation.h>
+
 #include "../../fileio_func.h"
 
 #include "ios_filesystem.h"
@@ -24,4 +27,10 @@ void DetermineBasePaths(std::string_view)
 	_searchpaths[Searchpath::PersonalDir] = documents;
 	_searchpaths[Searchpath::WorkingDir] = documents;
 	_searchpaths[Searchpath::AutodownloadPersonalDir] = documents + "content_download" PATHSEP;
+
+	/* Read-only documentation and licenses in the app bundle, as the Help window looks for them. */
+	@autoreleasepool {
+		NSString *manual = [NSBundle.mainBundle.resourcePath stringByAppendingPathComponent:@"Manual"];
+		if (manual != nil) _searchpaths[Searchpath::ApplicationBundleDir] = std::string{manual.fileSystemRepresentation} + PATHSEP;
+	}
 }
