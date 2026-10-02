@@ -24,10 +24,8 @@
 		950EC9B9CA8EEB0C85B4D7A0 /* CoreText.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BE153EB4B342BA12B2284567 /* CoreText.framework */; };
 		B3E9DFD080FA6E56AC42EE91 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6F0A8C67C968A99B10D101F7 /* Assets.xcassets */; };
 		BB4D44073C01152554AD6AB0 /* LZO.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 54D764641F164989CC68E487 /* LZO.xcframework */; };
-		BF55B228D27712C8BD237B21 /* AVFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4F2137D0EB8CE86376E5B32F /* AVFoundation.framework */; };
-		DE3C7F260581561DF058AF0C /* CoreAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CFAB0ECF8D6F694D2CFBE1E2 /* CoreAudio.framework */; };
+		D52F35DCD7F501C680825920 /* AVFAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 30E32FCDF25D5C43715F3E2D /* AVFAudio.framework */; };
 		E12D694EC02C9AADC2B08E63 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 33100AC045A8CD5EA732D03A /* CoreGraphics.framework */; };
-		E2E8234D9785D35626CE4BF4 /* CoreMedia.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5F504F695DC5968492C7C08E /* CoreMedia.framework */; };
 		F43E4D2F6AD7CA02C2BA16F8 /* Manual in Resources */ = {isa = PBXBuildFile; fileRef = 2840D3AACFB767C47D0F66E2 /* Manual */; };
 /* End PBXBuildFile section */
 
@@ -35,11 +33,10 @@
 		0948C0C1E819FCB36C18829A /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
 		0CDC5B368BC0EE65287A798C /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		2840D3AACFB767C47D0F66E2 /* Manual */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Manual; path = ../DerivedData/DataPackage/Manual; sourceTree = SOURCE_ROOT; };
+		30E32FCDF25D5C43715F3E2D /* AVFAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFAudio.framework; path = System/Library/Frameworks/AVFAudio.framework; sourceTree = SDKROOT; };
 		33100AC045A8CD5EA732D03A /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
-		4F2137D0EB8CE86376E5B32F /* AVFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFoundation.framework; path = System/Library/Frameworks/AVFoundation.framework; sourceTree = SDKROOT; };
 		529CE190AAD443096D95A69E /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
 		54D764641F164989CC68E487 /* LZO.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = LZO.xcframework; path = "../ios-deps/artifacts/LZO.xcframework"; sourceTree = "<group>"; };
-		5F504F695DC5968492C7C08E /* CoreMedia.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreMedia.framework; path = System/Library/Frameworks/CoreMedia.framework; sourceTree = SDKROOT; };
 		6C1E95F92E6374B4B07A0518 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
 		6EC6113A62B052F0DDAE811B /* OpenTTD.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = OpenTTD.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		6F0A8C67C968A99B10D101F7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
@@ -48,7 +45,6 @@
 		B31C015729C741BAB143EE42 /* LibLZMA.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = LibLZMA.xcframework; path = "../ios-deps/artifacts/LibLZMA.xcframework"; sourceTree = "<group>"; };
 		B78AB34339A4F930DB694AD1 /* SDL3.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = SDL3.xcframework; path = "../ios-deps/artifacts/SDL3.xcframework"; sourceTree = "<group>"; };
 		BE153EB4B342BA12B2284567 /* CoreText.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreText.framework; path = System/Library/Frameworks/CoreText.framework; sourceTree = SDKROOT; };
-		CFAB0ECF8D6F694D2CFBE1E2 /* CoreAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreAudio.framework; path = System/Library/Frameworks/CoreAudio.framework; sourceTree = SDKROOT; };
 		D5F6B776BA2176B5BBFB9317 /* GameController.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = GameController.framework; path = System/Library/Frameworks/GameController.framework; sourceTree = SDKROOT; };
 		DC2DF0381F53F3860267029C /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
 		E5603AE63DF34F6FED69F3F2 /* LibPNG.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = LibPNG.xcframework; path = "../ios-deps/artifacts/LibPNG.xcframework"; sourceTree = "<group>"; };
@@ -69,11 +65,9 @@
 				4D6E19F42572478133661454 /* LibPNG.xcframework in Frameworks */,
 				BB4D44073C01152554AD6AB0 /* LZO.xcframework in Frameworks */,
 				6981AB42D5ED91D3295B05EF /* AudioToolbox.framework in Frameworks */,
-				BF55B228D27712C8BD237B21 /* AVFoundation.framework in Frameworks */,
-				DE3C7F260581561DF058AF0C /* CoreAudio.framework in Frameworks */,
+				D52F35DCD7F501C680825920 /* AVFAudio.framework in Frameworks */,
 				E12D694EC02C9AADC2B08E63 /* CoreGraphics.framework in Frameworks */,
 				950EC9B9CA8EEB0C85B4D7A0 /* CoreText.framework in Frameworks */,
-				E2E8234D9785D35626CE4BF4 /* CoreMedia.framework in Frameworks */,
 				2852C53F0A7FF8ED3144E925 /* CoreVideo.framework in Frameworks */,
 				47FC259F525CA895C749C3AD /* Foundation.framework in Frameworks */,
 				3DCEB25157C4551881597F3E /* GameController.framework in Frameworks */,
@@ -143,10 +137,8 @@
 			isa = PBXGroup;
 			children = (
 				0948C0C1E819FCB36C18829A /* AudioToolbox.framework */,
-				4F2137D0EB8CE86376E5B32F /* AVFoundation.framework */,
-				CFAB0ECF8D6F694D2CFBE1E2 /* CoreAudio.framework */,
+				30E32FCDF25D5C43715F3E2D /* AVFAudio.framework */,
 				33100AC045A8CD5EA732D03A /* CoreGraphics.framework */,
-				5F504F695DC5968492C7C08E /* CoreMedia.framework */,
 				BE153EB4B342BA12B2284567 /* CoreText.framework */,
 				ECB3D60E56CD81218D5D22A8 /* CoreVideo.framework */,
 				529CE190AAD443096D95A69E /* Foundation.framework */,

@@ -85,11 +85,9 @@ targets:
       - framework: ../ios-deps/artifacts/LZO.xcframework
         embed: false
       - sdk: AudioToolbox.framework
-      - sdk: AVFoundation.framework
-      - sdk: CoreAudio.framework
+      - sdk: AVFAudio.framework
       - sdk: CoreGraphics.framework
       - sdk: CoreText.framework
-      - sdk: CoreMedia.framework
       - sdk: CoreVideo.framework
       - sdk: Foundation.framework
       - sdk: GameController.framework
