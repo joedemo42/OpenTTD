@@ -35,8 +35,6 @@ public:
 
 protected:
 	Dimension GetScreenSize() const override;
-	bool LockVideoBuffer() override;
-	void UnlockVideoBuffer() override;
 	void CheckPaletteAnim() override;
 	void InputLoop() override;
 	bool PollEvent() override;
@@ -92,7 +90,6 @@ private:
 	int text_input_cursor = 0;
 	float touch_pan_remainder_x = 0;
 	float touch_pan_remainder_y = 0;
-	bool buffer_locked = false;
 	bool event_watch_installed = false;
 	bool logged_first_present = false;
 	int logged_gui_scale = 0;

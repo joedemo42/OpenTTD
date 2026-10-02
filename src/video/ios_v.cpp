@@ -290,20 +290,6 @@ Dimension VideoDriver_iOS::GetScreenSize() const
 	return {1024, 768};
 }
 
-bool VideoDriver_iOS::LockVideoBuffer()
-{
-	if (this->buffer_locked) return false;
-	this->buffer_locked = true;
-	_screen.dst_ptr = this->framebuffer.data();
-	return true;
-}
-
-void VideoDriver_iOS::UnlockVideoBuffer()
-{
-	_screen.dst_ptr = nullptr;
-	this->buffer_locked = false;
-}
-
 void VideoDriver_iOS::CheckPaletteAnim()
 {
 	if (!CopyPalette(this->local_palette)) return;
