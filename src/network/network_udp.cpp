@@ -115,6 +115,8 @@ void NetworkUDPSearchGame()
 
 	Debug(net, 3, "Searching server");
 
+	/* Reopen the socket, as the OS may have invalidated it since the last search, e.g. iOS while the app was suspended. */
+	_udp_client.socket->Listen();
 	NetworkUDPBroadCast(*_udp_client.socket);
 	_network_udp_broadcast = 300; // Stay searching for 300 ticks
 }
