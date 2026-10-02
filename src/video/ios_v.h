@@ -17,7 +17,8 @@
 
 class VideoDriver_iOS final : public VideoDriver {
 public:
-	VideoDriver_iOS() : VideoDriver(true) {}
+	/* OpenTTD draws on the CPU; presenting only changed frames, the driver is paced by the refresh rate, not by vsync. */
+	VideoDriver_iOS() : VideoDriver(false) {}
 
 	std::optional<std::string_view> Start(const StringList &param) override;
 	void Stop() override;
