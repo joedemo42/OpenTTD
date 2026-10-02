@@ -779,8 +779,9 @@ bool VideoDriver_iOS::UpdateLayout(bool force)
 	CopyPalette(this->local_palette, true);
 	BlitterFactory::GetCurrentBlitter()->PostResize();
 	GameSizeChanged();
-	SDL_Log("IOS_VIDEO LAYOUT window=%dx%d safe=%d,%d %dx%d", new_window_width, new_window_height,
-			safe.x, safe.y, safe.w, safe.h);
+	const SDL_DisplayMode *display = SDL_GetDesktopDisplayMode(SDL_GetDisplayForWindow(this->window));
+	SDL_Log("IOS_VIDEO LAYOUT window=%dx%d safe=%d,%d %dx%d display=%dx%d", new_window_width, new_window_height,
+			safe.x, safe.y, safe.w, safe.h, display != nullptr ? display->w : 0, display != nullptr ? display->h : 0);
 	return true;
 }
 
