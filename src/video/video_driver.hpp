@@ -167,6 +167,15 @@ public:
 	}
 
 	/**
+	 * Get the lowest interface scale the automatic setting may choose for the current screen.
+	 * @return Interface scale in percent.
+	 */
+	virtual int GetMinimumAutoUIScale() const
+	{
+		return MIN_INTERFACE_SCALE;
+	}
+
+	/**
 	 * Get some information about the selected driver/backend to be shown to the user.
 	 * @return The information.
 	 */

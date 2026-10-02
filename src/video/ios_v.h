@@ -29,6 +29,7 @@ public:
 	bool AfterBlitterChange() override;
 	void EditBoxGainedFocus() override;
 	void EditBoxLostFocus() override;
+	int GetMinimumAutoUIScale() const override;
 	std::string_view GetName() const override { return "ios"; }
 	std::string_view GetInfoString() const override { return this->driver_info; }
 
@@ -81,6 +82,7 @@ private:
 	bool buffer_locked = false;
 	bool event_watch_installed = false;
 	bool logged_first_present = false;
+	int logged_gui_scale = 0;
 	bool edit_box_focused = false;
 	bool text_input_area_valid = false;
 	std::atomic<bool> backgrounded = false;

@@ -264,6 +264,13 @@ void VideoDriver_iOS::EditBoxLostFocus()
 	SDL_Log("IOS_INPUT IME focus=off");
 }
 
+int VideoDriver_iOS::GetMinimumAutoUIScale() const
+{
+	/* At least one interface unit per UIKit point, the size iOS sizes text and touch targets for. On phones this is
+	 * below the 640x480 design size, but anything smaller is too small to use there. Rounded to 25 % steps. */
+	return std::max(MIN_INTERFACE_SCALE, static_cast<int>(std::lround(this->scale_x * 4)) * 25);
+}
+
 Dimension VideoDriver_iOS::GetScreenSize() const
 {
 	if (_screen.width > 0 && _screen.height > 0) return {static_cast<uint>(_screen.width), static_cast<uint>(_screen.height)};
@@ -722,6 +729,11 @@ void VideoDriver_iOS::Paint()
 	if (!this->logged_first_present) {
 		SDL_Log("IOS_VIDEO PRESENT first_dirty=%d,%d %dx%d", update.x, update.y, update.w, update.h);
 		this->logged_first_present = true;
+	}
+	/* Logged here: the automatic scale is first resolved after Start(), and later by every layout change. */
+	if (_gui_scale != this->logged_gui_scale) {
+		SDL_Log("IOS_VIDEO SCALE gui=%d", _gui_scale);
+		this->logged_gui_scale = _gui_scale;
 	}
 	this->dirty_rect = {};
 }

@@ -1814,7 +1814,7 @@ void UpdateGUIZoom()
 		float ys = _screen.height / 480.f;
 		int scale = std::min(xs, ys) * 100;
 		/* Round down scaling to 25% increments and clamp to limits. */
-		_gui_scale = Clamp((scale / 25) * 25, MIN_INTERFACE_SCALE, MAX_INTERFACE_SCALE);
+		_gui_scale = Clamp((scale / 25) * 25, VideoDriver::GetInstance()->GetMinimumAutoUIScale(), MAX_INTERFACE_SCALE);
 	} else {
 		_gui_scale = Clamp(_gui_scale_cfg, MIN_INTERFACE_SCALE, MAX_INTERFACE_SCALE);
 	}
