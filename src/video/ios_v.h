@@ -48,6 +48,7 @@ private:
 	std::optional<std::string_view> StartFailure(std::string error);
 	bool UpdateLayout(bool force);
 	void HandleLifecycleEvent(Uint32 event_type);
+	void SaveForBackground();
 	OpenTTDIOSInput::LogicalPoint GetLogicalPoint(float x, float y) const;
 	void MoveCursor(const OpenTTDIOSInput::LogicalPoint &point, bool dispatch = true);
 	void HandleMouseMotion(const SDL_MouseMotionEvent &event);
@@ -85,6 +86,7 @@ private:
 	int logged_gui_scale = 0;
 	bool edit_box_focused = false;
 	bool text_input_area_valid = false;
+	bool background_save_requested = false;
 	std::atomic<bool> backgrounded = false;
 	std::atomic<bool> redraw_requested = false;
 };

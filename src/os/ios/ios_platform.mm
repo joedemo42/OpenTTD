@@ -20,6 +20,7 @@
 #include "../../thread.h"
 
 #include "ios_filesystem.h"
+#include "ios_platform.h"
 
 #include <Availability.h>
 #include <dispatch/dispatch.h>
@@ -124,6 +125,26 @@ void OSOpenBrowser(const std::string &url)
 			}];
 		});
 	}
+}
+
+static UIBackgroundTaskIdentifier _background_task = UIBackgroundTaskInvalid;
+
+/** Keeps the app running after it entered the background, until EndIOSBackgroundTask() or iOS's deadline. Main thread only. */
+void BeginIOSBackgroundTask()
+{
+	if (_background_task != UIBackgroundTaskInvalid) return;
+	_background_task = [UIApplication.sharedApplication beginBackgroundTaskWithName:@"OpenTTD save" expirationHandler:^{
+		Debug(misc, 0, "iOS: background time expired before saving finished");
+		EndIOSBackgroundTask();
+	}];
+}
+
+/** Lets iOS suspend the app again. Main thread only. */
+void EndIOSBackgroundTask()
+{
+	if (_background_task == UIBackgroundTaskInvalid) return;
+	[UIApplication.sharedApplication endBackgroundTask:_background_task];
+	_background_task = UIBackgroundTaskInvalid;
 }
 
 void SetCurrentThreadName(const std::string &thread_name)

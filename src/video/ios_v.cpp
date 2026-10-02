@@ -11,10 +11,17 @@
 #include "../blitter/factory.hpp"
 #include "../core/geometry_func.hpp"
 #include "../error_func.h"
+#include "../fios.h"
 #include "../framerate_type.h"
 #include "../gfx_func.h"
+#include "../highscore.h"
+#include "../hotkeys.h"
+#include "../network/network.h"
 #include "../openttd.h"
+#include "../os/ios/ios_platform.h"
 #include "../progress.h"
+#include "../saveload/saveload_func.h"
+#include "../settings_func.h"
 #include "../string_func.h"
 #include "../viewport_func.h"
 #include "../window_func.h"
@@ -205,6 +212,12 @@ void VideoDriver_iOS::MainLoop()
 {
 	this->StartGameThread();
 	while (!_exit_game) {
+		if (this->background_save_requested) {
+			this->SaveForBackground();
+			this->background_save_requested = false;
+			EndIOSBackgroundTask();
+		}
+
 		if (this->backgrounded) {
 			while (this->PollEvent()) {}
 			SDL_Delay(10);
@@ -798,6 +811,40 @@ bool VideoDriver_iOS::UpdateLayout(bool force)
 	return true;
 }
 
+/**
+ * Save what a terminated app would lose: the configuration and, unless this is a network client, the running game.
+ * The game becomes the next rotating autosave, independent of gui.autosave_on_exit.
+ */
+void VideoDriver_iOS::SaveForBackground()
+{
+	const auto start = std::chrono::steady_clock::now();
+	std::lock_guard<std::mutex> lock_wait(this->game_thread_wait_mutex);
+	std::lock_guard<std::mutex> lock_state(this->game_state_mutex);
+
+	const bool save_game = _game_mode == GameMode::Normal && !HasModalProgress() && (!_networking || _network_server);
+	if (save_game) {
+		_do_autosave = true;
+		SetWindowDirty(WindowClass::Statusbar, 0);
+		/* A fresh counter continues after the most recent autosave, like the regular autosave's counter. */
+		FiosNumberedSaveName autosave_counter("autosave");
+		DoAutoOrNetsave(autosave_counter);
+		WaitTillSaved();
+		_do_autosave = false;
+		SetWindowDirty(WindowClass::Statusbar, 0);
+	}
+
+	if (_save_config) {
+		SaveToConfig();
+		SaveHotkeysToConfig();
+		WindowDesc::SaveToConfig();
+		SaveToHighScore();
+	}
+
+	const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - start);
+	SDL_Log("IOS_VIDEO LIFECYCLE saved game=%s config=%s ms=%lld", save_game ? "yes" : "no", _save_config ? "yes" : "no",
+			static_cast<long long>(elapsed.count()));
+}
+
 bool SDLCALL VideoDriver_iOS::WatchLifecycle(void *userdata, SDL_Event *event)
 {
 	static_cast<VideoDriver_iOS *>(userdata)->HandleLifecycleEvent(event->type);
@@ -811,6 +858,11 @@ void VideoDriver_iOS::HandleLifecycleEvent(Uint32 event_type)
 		case SDL_EVENT_DID_ENTER_BACKGROUND:
 			this->backgrounded = true;
 			this->SetGameThreadSuspended(true);
+			/* iOS may terminate a suspended app without notice. Keep running until MainLoop() has saved. */
+			if (event_type == SDL_EVENT_DID_ENTER_BACKGROUND && !this->background_save_requested) {
+				BeginIOSBackgroundTask();
+				this->background_save_requested = true;
+			}
 			SDL_Log("IOS_VIDEO LIFECYCLE background event=%u", event_type);
 			break;
 
