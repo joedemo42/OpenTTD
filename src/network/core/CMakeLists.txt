@@ -10,6 +10,7 @@ add_files(
     host.cpp
     host.h
     http.h
+    http_policy.h
     os_abstraction.cpp
     os_abstraction.h
     packet.cpp
@@ -44,6 +45,10 @@ add_files(
     CONDITION WIN32
 )
 add_files(
+    http_nsurlsession.mm
+    CONDITION IOS
+)
+add_files(
     http_none.cpp
-    CONDITION NOT CURL_FOUND AND NOT WIN32
+    CONDITION NOT CURL_FOUND AND NOT WIN32 AND NOT IOS
 )

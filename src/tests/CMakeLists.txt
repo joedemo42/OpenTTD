@@ -5,6 +5,7 @@ add_test_files(
     flatset_type.cpp
     history_func.cpp
     ios_audio.cpp
+    ios_http.cpp
     ios_input.cpp
     ios_music.cpp
     landscape_partial_pixel_z.cpp
