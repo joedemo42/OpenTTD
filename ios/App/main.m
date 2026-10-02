@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <SDL3/SDL.h>
 #include <SDL3/SDL_main.h>
 #include <openttd_ios.h>
@@ -18,5 +19,7 @@ int main(int argc, char *argv[])
 	SDL_SetAppMetadata("OpenTTD", "0.1", "com.example.openttd");
 	SDL_SetHint(SDL_HINT_RENDER_DRIVER, "metal");
 	SDL_Log("IOS_ENGINE START revision=%s", OpenTTDIOSGetEngineRevision());
-	return OpenTTDIOSMain(argc, argv);
+	OpenTTDIOSMain(argc, argv);
+	/* SDL's UIKit run loop outlives main and would leave a black screen; quit like the desktop ports. */
+	exit(0);
 }
