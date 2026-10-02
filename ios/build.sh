@@ -976,7 +976,8 @@ upload_ipa()
 	fi
 	mkdir -p "$ARCHIVE_DIR"
 	cp "$IPA_PATH" "$archived"
-	[[ "$CONFIGURATION" == Debug ]] || ditto -c -k --keepParent "$dsym" "$dsym_zip"
+	# No AppleDouble (._*) entries: they break dwarfdump on the unpacked dSYM.
+	[[ "$CONFIGURATION" == Debug ]] || ditto -c -k --norsrc --noextattr --noacl --keepParent "$dsym" "$dsym_zip"
 	curl --fail --silent --show-error -F "file=@$archived" ${NOTES_FORM[@]+"${NOTES_FORM[@]}"} "$REPO_SERVER_URL"
 	echo
 	echo "Uploaded archive/$IPA_NAME"
