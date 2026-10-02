@@ -11,9 +11,12 @@
 
 #import <Foundation/Foundation.h>
 
+#include "../../debug.h"
 #include "../../fileio_func.h"
 
 #include "ios_filesystem.h"
+
+#include <unistd.h>
 
 #include "../../safeguards.h"
 
@@ -25,6 +28,8 @@ void DetermineBasePaths(std::string_view)
 	std::string documents = GetIOSDocumentsDirectory();
 	AppendPathSeparator(documents);
 	_searchpaths[Searchpath::PersonalDir] = documents;
+	/* The working directory is Documents as well, so relative paths on the command line (-c, -g) resolve there. */
+	if (chdir(documents.c_str()) != 0) Debug(misc, 0, "Unable to change the working directory to {}", documents);
 	_searchpaths[Searchpath::WorkingDir] = documents;
 	_searchpaths[Searchpath::AutodownloadPersonalDir] = documents + "content_download" PATHSEP;
 
