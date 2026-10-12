@@ -425,6 +425,10 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				OTHER_CFLAGS = (
+					"$(inherited)",
+					"-fno-standalone-debug",
+				);
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",

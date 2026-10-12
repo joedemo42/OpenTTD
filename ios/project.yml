@@ -71,6 +71,9 @@ targets:
           - -lc++
           - -lm
           - -lpthread
+      configs:
+        Debug:
+          OTHER_CFLAGS: ["$(inherited)", "-fno-standalone-debug"]
     dependencies:
       - framework: ../DerivedData/OpenTTD-engine/OpenTTDEngine.xcframework
         embed: false

@@ -325,7 +325,8 @@ engine_arguments()
 	local sdk="$1"
 	local slice
 	slice="$(slice_id "$sdk")"
-	# Debug apps keep the optimized engine; Release uses upstream's release build type, whose -g feeds the dSYM.
+	# Debug apps keep the optimized engine (no debug info). Release uses upstream's release build type without its
+	# -g: the static engine reaches the app's dSYM as symbol table only.
 	local build_type=Release
 	[[ "$CONFIGURATION" == Debug ]] || build_type=RelWithDebInfo
 	printf '%s\n' \
@@ -335,6 +336,8 @@ engine_arguments()
 		-DCMAKE_OSX_DEPLOYMENT_TARGET="$IOS_MIN_VERSION" \
 		-DCMAKE_CXX_COMPILER="$(xcrun --find clang++)" \
 		-DCMAKE_BUILD_TYPE="$build_type" \
+		-DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG" \
+		-DCMAKE_OBJCXX_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG" \
 		-DCMAKE_POSITION_INDEPENDENT_CODE=ON \
 		-DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
 		-DHOST_BINARY_DIR="$(cmake_tree host)" \
