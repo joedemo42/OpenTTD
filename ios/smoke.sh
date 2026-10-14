@@ -296,9 +296,11 @@ smoke_multiplayer()
 	[[ "$host_address" =~ ^[[:xdigit:].:]+$ ]] || \
 		fail "could not determine a host address reachable from the simulator; pass --host"
 
-	require_tool cmake ninja
+	require_tool cmake ninja unzip
 	configure_host_tests
 	cmake --build "$HOST_TESTS" --target openttd --parallel
+	# The dedicated server needs a base graphics set; without one it waits in an error dialog.
+	unzip -oqj "$REPO_ROOT/Data/opengfx-8.0-all.zip" '*.tar' -d "$HOST_TESTS/baseset"
 
 	local simulator container
 	simulator="$(resolve_simulator "$simulator_name")"
