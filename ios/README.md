@@ -1,6 +1,6 @@
 # OpenTTD for iOS and iPadOS
 
-A native arm64 port for iOS/iPadOS 26 or later: SDL3 with its Metal renderer, CoreText, an SDL3 sound driver, a native MIDI synthesizer and an NSURLSession HTTP backend. All dependencies are static; the app links only system frameworks.
+A native arm64 port for iOS/iPadOS 18 or later: SDL3 with its Metal renderer, CoreText, an SDL3 sound driver, a native MIDI synthesizer and an NSURLSession HTTP backend. All dependencies are static; the app links only system frameworks.
 
 ## Prerequisites
 

@@ -431,7 +431,7 @@ smoke_archive()
 	require_plist "$plist" CFBundleIdentifier "$BUNDLE_ID"
 	require_plist "$plist" CFBundleExecutable OpenTTD
 	require_plist "$plist" CFBundleDisplayName OpenTTD
-	require_plist "$plist" MinimumOSVersion 26.0
+	require_plist "$plist" MinimumOSVersion 18.0
 	require_plist "$plist" CFBundleSupportedPlatforms.0 iPhoneOS
 	require_plist "$plist" UIDeviceFamily.0 1
 	require_plist "$plist" UIDeviceFamily.1 2

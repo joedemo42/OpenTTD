@@ -10,7 +10,7 @@ BUILD_ROOT="$DEPS_DIR/build"
 ARTIFACT_ROOT="$DEPS_DIR/artifacts"
 PATCH_ROOT="$DEPS_DIR/patches"
 PROBE_ROOT="$DEPS_DIR/probes"
-IOS_MIN_VERSION="26.0"
+IOS_MIN_VERSION="18.0"
 
 # Build order: prerequisites first.
 DEPENDENCIES="sdl3 zlib xz libpng lzo timgm6mb"

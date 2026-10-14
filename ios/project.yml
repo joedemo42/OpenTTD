@@ -2,7 +2,7 @@ name: OpenTTD
 options:
   createIntermediateGroups: true
   deploymentTarget:
-    iOS: "26.0"
+    iOS: "18.0"
   xcodeVersion: "26.0"
 settings:
   base:
@@ -12,7 +12,7 @@ settings:
     DEAD_CODE_STRIPPING: YES
     DEVELOPMENT_TEAM: XXXXXXXXXX
     ENABLE_BITCODE: NO
-    IPHONEOS_DEPLOYMENT_TARGET: "26.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "18.0"
     MARKETING_VERSION: "16.0"
     ONLY_ACTIVE_ARCH: YES
     PRODUCT_BUNDLE_IDENTIFIER: com.example.openttd
@@ -28,7 +28,7 @@ targets:
   OpenTTD:
     type: application
     platform: iOS
-    deploymentTarget: "26.0"
+    deploymentTarget: "18.0"
     info:
       path: App/Info.plist
       properties:

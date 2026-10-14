@@ -17,7 +17,7 @@ SCHEME="OpenTTD"
 BUNDLE_ID="com.example.openttd"
 DEFAULT_SIMULATOR="iPad Air 11-inch (M4)"
 DEFAULT_DEVICE="OldPad"
-IOS_MIN_VERSION="26.0"
+IOS_MIN_VERSION="18.0"
 ENGINE_ROOT="$DERIVED_DATA/OpenTTD-engine"
 ENGINE_XCFRAMEWORK="$ENGINE_ROOT/OpenTTDEngine.xcframework"
 # Bump when a CMake cache default changes, so every engine tree is configured afresh.
