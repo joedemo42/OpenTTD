@@ -583,6 +583,8 @@ xcode_build()
 	else
 		arguments+=(-destination 'generic/platform=iOS')
 	fi
+	# Release strips the product in place; a build without a relink would run dsymutil on the stripped binary.
+	[[ "$CONFIGURATION" == Debug ]] || rm -f "$(app_path "$platform")/OpenTTD"
 	xcodebuild "${arguments[@]}" "CURRENT_PROJECT_VERSION=$BUILD_NUMBER" build
 	verify_bundled_data "$platform"
 }
