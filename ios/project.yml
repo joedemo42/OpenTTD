@@ -35,6 +35,7 @@ targets:
         CFBundleDisplayName: OpenTTD
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
+        ITSAppUsesNonExemptEncryption: false
         LSApplicationCategoryType: public.app-category.simulation-games
         LSSupportsOpeningDocumentsInPlace: true
         NSLocalNetworkUsageDescription: OpenTTD uses your local network to discover and join multiplayer games.

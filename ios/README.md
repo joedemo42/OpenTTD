@@ -37,6 +37,10 @@ The pinned dependency sources (SDL3, zlib, xz, libpng, LZO, TimGM6mb) are downlo
 ./build-ios.sh documents zip                  # Documents payload for manual transfer
 ```
 
+## TestFlight
+
+`ios/testflight.sh upload` re-signs the current release device build (`./build-ios.sh build device --release`) for App Store distribution and uploads it with its dSYM through the Apple ID signed in to Xcode. The app declares its encryption exempt (`ITSAppUsesNonExemptEncryption = NO`). The App Store Connect app record, TestFlight test information, external groups and public links are set up on the App Store Connect website.
+
 Builds are incremental; `ios/BUILD_NUMBER` counts every build and is never reset.
 
 ## Checks
