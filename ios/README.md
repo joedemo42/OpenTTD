@@ -12,7 +12,13 @@ A native arm64 port for iOS/iPadOS 18 or later: SDL3 with its Metal renderer, Co
 
 Neither is tracked in this repository:
 
-- `source/`: an OpenTTD clone on the port's `openttd-ios` branch, checked out at the commit in `SOURCES.lock` (the branch is based on the upstream commit recorded there).
+- `source/`: a clone of the port's engine fork, branch `openttd-ios`, checked out at the commit in `SOURCES.lock` (the branch is based on the upstream commit recorded there):
+
+  ```
+  git clone --branch openttd-ios https://github.com/joedemo42/OpenTTD source
+  git -C source checkout <commit from SOURCES.lock>
+  ```
+
 - `Data/`: the base sets as released by openttd.org, unmodified:
 
   | File | SHA-256 |
@@ -48,3 +54,7 @@ Builds are incremental; `ios/BUILD_NUMBER` counts every build and is never reset
 - Documents is visible in the Files app and in Finder: saves, screenshots, configuration, downloaded content and crash files (`crash*.json.log`, `crash*.sav`, `crash*.png`).
 - Entering the background saves the configuration and the running game (next rotating autosave), because iOS may end a suspended app without notice.
 - Crash reports from iOS (`.ips`) are symbolicated with the release build's `archive/OpenTTD-<version>-<build>.dSYM.zip`.
+
+## License
+
+GPL-2.0 (see `LICENSE`), like OpenTTD itself. Dependencies and base sets keep their own licenses.
