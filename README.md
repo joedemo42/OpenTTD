@@ -1,5 +1,7 @@
 # OpenTTD
 
+> **Unofficial iOS/iPadOS port.** This branch adds an iPhone and iPad port to OpenTTD. It is not an official OpenTTD release and is not supported by the OpenTTD team, so please don't ask about it on the OpenTTD forums or issue tracker. Building, running and packaging the app: [ios/README.md](ios/README.md).
+
 ## Table of contents
 
 - 1.0) [About](#10-about)
