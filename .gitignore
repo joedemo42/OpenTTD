@@ -6,3 +6,17 @@ docs/gamedocs/*
 docs/source/*
 /out
 /vcpkg_installed
+
+# iOS port: build output and local settings
+/DerivedData/
+/archive/
+/ios-deps/build/
+/ios-deps/source/
+/ios-deps/artifacts/
+/ios/BUILD_NUMBER
+xcuserdata/
+/build.config
+
+# Tracked despite /build*
+!/build-ios.sh
+!/build.config.sample

@@ -1,0 +1,468 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0679020E3A79E515130263DC /* Metal.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6C1E95F92E6374B4B07A0518 /* Metal.framework */; };
+		214A6DC82176901D5BD17D7C /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F467F5B2CCA75C74DCCDF4A3 /* QuartzCore.framework */; };
+		2852C53F0A7FF8ED3144E925 /* CoreVideo.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = ECB3D60E56CD81218D5D22A8 /* CoreVideo.framework */; };
+		2A673900C8A63EE803FD3AFC /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DC2DF0381F53F3860267029C /* UIKit.framework */; };
+		3813F0881D0665BC98B45898 /* Zlib.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7F944515AEEDF2B228EB6394 /* Zlib.xcframework */; };
+		3DCEB25157C4551881597F3E /* GameController.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D5F6B776BA2176B5BBFB9317 /* GameController.framework */; };
+		47FC259F525CA895C749C3AD /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 529CE190AAD443096D95A69E /* Foundation.framework */; };
+		4853F8E4A5FCE8CED46D8285 /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 0CDC5B368BC0EE65287A798C /* main.m */; };
+		4D6E19F42572478133661454 /* LibPNG.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = E5603AE63DF34F6FED69F3F2 /* LibPNG.xcframework */; };
+		63211843CFC37F8A29539000 /* LibLZMA.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = B31C015729C741BAB143EE42 /* LibLZMA.xcframework */; };
+		6981AB42D5ED91D3295B05EF /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 0948C0C1E819FCB36C18829A /* AudioToolbox.framework */; };
+		6F1B8A53286452D5E8B8906A /* SeedData in Resources */ = {isa = PBXBuildFile; fileRef = F6B4F02AA52F2D01E59C091F /* SeedData */; };
+		7E02A1D7F1B7F251CF3C9746 /* SDL3.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = B78AB34339A4F930DB694AD1 /* SDL3.xcframework */; };
+		89FE9071AE267E110381F1C4 /* OpenTTDEngine.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 97123F94A793BC9D25F43D2B /* OpenTTDEngine.xcframework */; };
+		950EC9B9CA8EEB0C85B4D7A0 /* CoreText.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BE153EB4B342BA12B2284567 /* CoreText.framework */; };
+		B3E9DFD080FA6E56AC42EE91 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 6F0A8C67C968A99B10D101F7 /* Assets.xcassets */; };
+		BB4D44073C01152554AD6AB0 /* LZO.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 54D764641F164989CC68E487 /* LZO.xcframework */; };
+		D52F35DCD7F501C680825920 /* AVFAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 30E32FCDF25D5C43715F3E2D /* AVFAudio.framework */; };
+		E12D694EC02C9AADC2B08E63 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 33100AC045A8CD5EA732D03A /* CoreGraphics.framework */; };
+		F43E4D2F6AD7CA02C2BA16F8 /* Manual in Resources */ = {isa = PBXBuildFile; fileRef = 2840D3AACFB767C47D0F66E2 /* Manual */; };
+		FA9D98FDA3F4C965B1225134 /* AppIcon.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 018AEA8AE0015E665AD90F4F /* AppIcon.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		018AEA8AE0015E665AD90F4F /* AppIcon.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = AppIcon.xcassets; sourceTree = "<group>"; };
+		0948C0C1E819FCB36C18829A /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
+		0CDC5B368BC0EE65287A798C /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
+		2840D3AACFB767C47D0F66E2 /* Manual */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Manual; path = ../DerivedData/DataPackage/Manual; sourceTree = SOURCE_ROOT; };
+		30E32FCDF25D5C43715F3E2D /* AVFAudio.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AVFAudio.framework; path = System/Library/Frameworks/AVFAudio.framework; sourceTree = SDKROOT; };
+		33100AC045A8CD5EA732D03A /* CoreGraphics.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreGraphics.framework; path = System/Library/Frameworks/CoreGraphics.framework; sourceTree = SDKROOT; };
+		529CE190AAD443096D95A69E /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = System/Library/Frameworks/Foundation.framework; sourceTree = SDKROOT; };
+		54D764641F164989CC68E487 /* LZO.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = LZO.xcframework; path = "../ios-deps/artifacts/LZO.xcframework"; sourceTree = "<group>"; };
+		6C1E95F92E6374B4B07A0518 /* Metal.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Metal.framework; path = System/Library/Frameworks/Metal.framework; sourceTree = SDKROOT; };
+		6EC6113A62B052F0DDAE811B /* OpenTTD.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = OpenTTD.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		6F0A8C67C968A99B10D101F7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		7F944515AEEDF2B228EB6394 /* Zlib.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = Zlib.xcframework; path = "../ios-deps/artifacts/Zlib.xcframework"; sourceTree = "<group>"; };
+		97123F94A793BC9D25F43D2B /* OpenTTDEngine.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = OpenTTDEngine.xcframework; path = "../DerivedData/OpenTTD-engine/OpenTTDEngine.xcframework"; sourceTree = "<group>"; };
+		B31C015729C741BAB143EE42 /* LibLZMA.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = LibLZMA.xcframework; path = "../ios-deps/artifacts/LibLZMA.xcframework"; sourceTree = "<group>"; };
+		B78AB34339A4F930DB694AD1 /* SDL3.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = SDL3.xcframework; path = "../ios-deps/artifacts/SDL3.xcframework"; sourceTree = "<group>"; };
+		BE153EB4B342BA12B2284567 /* CoreText.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreText.framework; path = System/Library/Frameworks/CoreText.framework; sourceTree = SDKROOT; };
+		D5F6B776BA2176B5BBFB9317 /* GameController.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = GameController.framework; path = System/Library/Frameworks/GameController.framework; sourceTree = SDKROOT; };
+		DC2DF0381F53F3860267029C /* UIKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = UIKit.framework; path = System/Library/Frameworks/UIKit.framework; sourceTree = SDKROOT; };
+		E5603AE63DF34F6FED69F3F2 /* LibPNG.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = LibPNG.xcframework; path = "../ios-deps/artifacts/LibPNG.xcframework"; sourceTree = "<group>"; };
+		ECB3D60E56CD81218D5D22A8 /* CoreVideo.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreVideo.framework; path = System/Library/Frameworks/CoreVideo.framework; sourceTree = SDKROOT; };
+		F467F5B2CCA75C74DCCDF4A3 /* QuartzCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = QuartzCore.framework; path = System/Library/Frameworks/QuartzCore.framework; sourceTree = SDKROOT; };
+		F6B4F02AA52F2D01E59C091F /* SeedData */ = {isa = PBXFileReference; lastKnownFileType = folder; name = SeedData; path = ../DerivedData/DataPackage/SeedData; sourceTree = SOURCE_ROOT; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		A348D50955C418EF37A47F52 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				89FE9071AE267E110381F1C4 /* OpenTTDEngine.xcframework in Frameworks */,
+				7E02A1D7F1B7F251CF3C9746 /* SDL3.xcframework in Frameworks */,
+				3813F0881D0665BC98B45898 /* Zlib.xcframework in Frameworks */,
+				63211843CFC37F8A29539000 /* LibLZMA.xcframework in Frameworks */,
+				4D6E19F42572478133661454 /* LibPNG.xcframework in Frameworks */,
+				BB4D44073C01152554AD6AB0 /* LZO.xcframework in Frameworks */,
+				6981AB42D5ED91D3295B05EF /* AudioToolbox.framework in Frameworks */,
+				D52F35DCD7F501C680825920 /* AVFAudio.framework in Frameworks */,
+				E12D694EC02C9AADC2B08E63 /* CoreGraphics.framework in Frameworks */,
+				950EC9B9CA8EEB0C85B4D7A0 /* CoreText.framework in Frameworks */,
+				2852C53F0A7FF8ED3144E925 /* CoreVideo.framework in Frameworks */,
+				47FC259F525CA895C749C3AD /* Foundation.framework in Frameworks */,
+				3DCEB25157C4551881597F3E /* GameController.framework in Frameworks */,
+				0679020E3A79E515130263DC /* Metal.framework in Frameworks */,
+				214A6DC82176901D5BD17D7C /* QuartzCore.framework in Frameworks */,
+				2A673900C8A63EE803FD3AFC /* UIKit.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		2CC208DAD2692E3D739B9815 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				6EC6113A62B052F0DDAE811B /* OpenTTD.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		87658B2C39F91B47A5EE68F3 /* DerivedData */ = {
+			isa = PBXGroup;
+			children = (
+				018AEA8AE0015E665AD90F4F /* AppIcon.xcassets */,
+				DFF8F242D15A894F14ACAF7C /* DataPackage */,
+			);
+			path = DerivedData;
+			sourceTree = "<group>";
+		};
+		A6C15A571F87B955C59A37CD = {
+			isa = PBXGroup;
+			children = (
+				6F0A8C67C968A99B10D101F7 /* Assets.xcassets */,
+				ADE31DB5E525A379045A3D29 /* App */,
+				CF7EE012BE1534CF179EA1CB /* OpenTTD */,
+				E2F2D454E7E4FCCAE96D6613 /* Frameworks */,
+				2CC208DAD2692E3D739B9815 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		ADE31DB5E525A379045A3D29 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				0CDC5B368BC0EE65287A798C /* main.m */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		CF7EE012BE1534CF179EA1CB /* OpenTTD */ = {
+			isa = PBXGroup;
+			children = (
+				87658B2C39F91B47A5EE68F3 /* DerivedData */,
+			);
+			name = OpenTTD;
+			path = ..;
+			sourceTree = "<group>";
+		};
+		DFF8F242D15A894F14ACAF7C /* DataPackage */ = {
+			isa = PBXGroup;
+			children = (
+				2840D3AACFB767C47D0F66E2 /* Manual */,
+				F6B4F02AA52F2D01E59C091F /* SeedData */,
+			);
+			path = DataPackage;
+			sourceTree = "<group>";
+		};
+		E2F2D454E7E4FCCAE96D6613 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				0948C0C1E819FCB36C18829A /* AudioToolbox.framework */,
+				30E32FCDF25D5C43715F3E2D /* AVFAudio.framework */,
+				33100AC045A8CD5EA732D03A /* CoreGraphics.framework */,
+				BE153EB4B342BA12B2284567 /* CoreText.framework */,
+				ECB3D60E56CD81218D5D22A8 /* CoreVideo.framework */,
+				529CE190AAD443096D95A69E /* Foundation.framework */,
+				D5F6B776BA2176B5BBFB9317 /* GameController.framework */,
+				B31C015729C741BAB143EE42 /* LibLZMA.xcframework */,
+				E5603AE63DF34F6FED69F3F2 /* LibPNG.xcframework */,
+				54D764641F164989CC68E487 /* LZO.xcframework */,
+				6C1E95F92E6374B4B07A0518 /* Metal.framework */,
+				97123F94A793BC9D25F43D2B /* OpenTTDEngine.xcframework */,
+				F467F5B2CCA75C74DCCDF4A3 /* QuartzCore.framework */,
+				B78AB34339A4F930DB694AD1 /* SDL3.xcframework */,
+				DC2DF0381F53F3860267029C /* UIKit.framework */,
+				7F944515AEEDF2B228EB6394 /* Zlib.xcframework */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A6458F2824F9C0AC8AE54E04 /* OpenTTD */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = C1AD2C3F4C8DCE6D2CBD4A8E /* Build configuration list for PBXNativeTarget "OpenTTD" */;
+			buildPhases = (
+				8350C9B2312B8CFAAF811AEF /* Sources */,
+				AEBB3032E884A89F88256CD8 /* Resources */,
+				A348D50955C418EF37A47F52 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = OpenTTD;
+			packageProductDependencies = (
+			);
+			productName = OpenTTD;
+			productReference = 6EC6113A62B052F0DDAE811B /* OpenTTD.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		E2493D5DBD533A62C1AB1F91 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 2600;
+				TargetAttributes = {
+					A6458F2824F9C0AC8AE54E04 = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 888628E4F7B620B187B1A060 /* Build configuration list for PBXProject "OpenTTD" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = A6C15A571F87B955C59A37CD;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 2CC208DAD2692E3D739B9815 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A6458F2824F9C0AC8AE54E04 /* OpenTTD */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		AEBB3032E884A89F88256CD8 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FA9D98FDA3F4C965B1225134 /* AppIcon.xcassets in Resources */,
+				B3E9DFD080FA6E56AC42EE91 /* Assets.xcassets in Resources */,
+				F43E4D2F6AD7CA02C2BA16F8 /* Manual in Resources */,
+				6F1B8A53286452D5E8B8906A /* SeedData in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		8350C9B2312B8CFAAF811AEF /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4853F8E4A5FCE8CED46D8285 /* main.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		2E300FFB7ABB1E7CBD975382 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEPLOYMENT_POSTPROCESSING = YES;
+				ENABLE_BITCODE = NO;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 16.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		587DC7690EC7FD421E7ABF45 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"../DerivedData/OpenTTD-engine\"",
+					"\"../ios-deps/artifacts\"",
+				);
+				INFOPLIST_FILE = App/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+					"-Wl,-force_load,$(BUILT_PRODUCTS_DIR)/libopenttd_engine.a",
+					"-lc++",
+					"-lm",
+					"-lpthread",
+				);
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		733E09AEC786F35215652F7E /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ARCHS = arm64;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_BITCODE = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 16.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		F4EAD7BE205672314782ABC0 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				FRAMEWORK_SEARCH_PATHS = (
+					"$(inherited)",
+					"\"../DerivedData/OpenTTD-engine\"",
+					"\"../ios-deps/artifacts\"",
+				);
+				INFOPLIST_FILE = App/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				OTHER_CFLAGS = (
+					"$(inherited)",
+					"-fno-standalone-debug",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-ObjC",
+					"-Wl,-force_load,$(BUILT_PRODUCTS_DIR)/libopenttd_engine.a",
+					"-lc++",
+					"-lm",
+					"-lpthread",
+				);
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		888628E4F7B620B187B1A060 /* Build configuration list for PBXProject "OpenTTD" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				733E09AEC786F35215652F7E /* Debug */,
+				2E300FFB7ABB1E7CBD975382 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		C1AD2C3F4C8DCE6D2CBD4A8E /* Build configuration list for PBXNativeTarget "OpenTTD" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F4EAD7BE205672314782ABC0 /* Debug */,
+				587DC7690EC7FD421E7ABF45 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = E2493D5DBD533A62C1AB1F91 /* Project object */;
+}
