@@ -519,7 +519,7 @@ build_timgm6mb()
 	local root="$BUILD_ROOT/timgm6mb"
 	local output="$ARTIFACT_ROOT/TimGM6mb"
 	local license_notice="$DEPS_DIR/licenses/TimGM6mb.txt"
-	local gpl_text="$REPO_ROOT/source/COPYING.md"
+	local gpl_text="$REPO_ROOT/COPYING.md"
 	local fingerprint
 	fingerprint="$SHA256:$TIMGM6MB_SF2_SHA256:$(sha256_file "$license_notice"):$(sha256_file "$gpl_text")"
 	if [[ -f "$output/artifact.stamp" && "$(<"$output/artifact.stamp")" == "$fingerprint" ]]; then

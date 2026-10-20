@@ -10,14 +10,13 @@ A native arm64 port for iOS/iPadOS 18 or later: SDL3 with its Metal renderer, Co
 
 ## Sources and data
 
-Neither is tracked in this repository:
+Branch `openttd-ios` of [joedemo42/OpenTTD](https://github.com/joedemo42/OpenTTD) is OpenTTD (upstream commit `ed04d336`, development after 16.0-beta2) with the port on top: engine changes are ordinary commits in the OpenTTD tree (`git diff ed04d336 openttd-ios -- CMakeLists.txt cmake src`), the app host and build scripts live in `ios/`, `ios-deps/` and `build-ios.sh`.
 
-- `source/`: a clone of the port's engine fork, branch `openttd-ios`, checked out at the commit in `SOURCES.lock` (the branch is based on the upstream commit recorded there):
+```
+git clone --branch openttd-ios https://github.com/joedemo42/OpenTTD
+```
 
-  ```
-  git clone --branch openttd-ios https://github.com/joedemo42/OpenTTD source
-  git -C source checkout <commit from SOURCES.lock>
-  ```
+Not tracked:
 
 - `Data/`: the base sets as released by openttd.org, unmodified:
 

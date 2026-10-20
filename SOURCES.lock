@@ -1,5 +1,0 @@
-# OpenTTD checkout in source/ that this commit of the main repository builds.
-repository https://github.com/joedemo42/OpenTTD
-branch     openttd-ios
-base       ed04d336ed9d78a0e9e7a517d4f40f03a3ead895
-commit     5177ec83305599e02efb5cfc6a2b245e09128e62
