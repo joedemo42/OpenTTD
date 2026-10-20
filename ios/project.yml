@@ -10,12 +10,10 @@ settings:
     GCC_C_LANGUAGE_STANDARD: gnu17
     CODE_SIGN_STYLE: Automatic
     DEAD_CODE_STRIPPING: YES
-    DEVELOPMENT_TEAM: XXXXXXXXXX
     ENABLE_BITCODE: NO
     IPHONEOS_DEPLOYMENT_TARGET: "18.0"
     MARKETING_VERSION: "16.0"
     ONLY_ACTIVE_ARCH: YES
-    PRODUCT_BUNDLE_IDENTIFIER: com.example.openttd
     SUPPORTS_MACCATALYST: NO
     SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD: NO
     SUPPORTED_PLATFORMS: "iphoneos iphonesimulator"
@@ -32,7 +30,7 @@ targets:
     info:
       path: App/Info.plist
       properties:
-        CFBundleDisplayName: OpenTTD
+        CFBundleDisplayName: "$(APP_DISPLAY_NAME)"
         CFBundleShortVersionString: "$(MARKETING_VERSION)"
         CFBundleVersion: "$(CURRENT_PROJECT_VERSION)"
         ITSAppUsesNonExemptEncryption: false
@@ -55,6 +53,8 @@ targets:
     sources:
       - path: App/main.m
       - path: Assets.xcassets
+        buildPhase: resources
+      - path: ../DerivedData/AppIcon.xcassets
         buildPhase: resources
       - path: ../DerivedData/DataPackage/SeedData
         type: folder

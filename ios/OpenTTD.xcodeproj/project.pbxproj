@@ -27,9 +27,11 @@
 		D52F35DCD7F501C680825920 /* AVFAudio.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 30E32FCDF25D5C43715F3E2D /* AVFAudio.framework */; };
 		E12D694EC02C9AADC2B08E63 /* CoreGraphics.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 33100AC045A8CD5EA732D03A /* CoreGraphics.framework */; };
 		F43E4D2F6AD7CA02C2BA16F8 /* Manual in Resources */ = {isa = PBXBuildFile; fileRef = 2840D3AACFB767C47D0F66E2 /* Manual */; };
+		FA9D98FDA3F4C965B1225134 /* AppIcon.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 018AEA8AE0015E665AD90F4F /* AppIcon.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		018AEA8AE0015E665AD90F4F /* AppIcon.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = AppIcon.xcassets; sourceTree = "<group>"; };
 		0948C0C1E819FCB36C18829A /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
 		0CDC5B368BC0EE65287A798C /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		2840D3AACFB767C47D0F66E2 /* Manual */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Manual; path = ../DerivedData/DataPackage/Manual; sourceTree = SOURCE_ROOT; };
@@ -91,6 +93,7 @@
 		87658B2C39F91B47A5EE68F3 /* DerivedData */ = {
 			isa = PBXGroup;
 			children = (
+				018AEA8AE0015E665AD90F4F /* AppIcon.xcassets */,
 				DFF8F242D15A894F14ACAF7C /* DataPackage */,
 			);
 			path = DerivedData;
@@ -188,7 +191,6 @@
 				LastUpgradeCheck = 2600;
 				TargetAttributes = {
 					A6458F2824F9C0AC8AE54E04 = {
-						DevelopmentTeam = XXXXXXXXXX;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -217,6 +219,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				FA9D98FDA3F4C965B1225134 /* AppIcon.xcassets in Resources */,
 				B3E9DFD080FA6E56AC42EE91 /* Assets.xcassets in Resources */,
 				F43E4D2F6AD7CA02C2BA16F8 /* Manual in Resources */,
 				6F1B8A53286452D5E8B8906A /* SeedData in Resources */,
@@ -276,7 +279,6 @@
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				DEPLOYMENT_POSTPROCESSING = YES;
-				DEVELOPMENT_TEAM = XXXXXXXXXX;
 				ENABLE_BITCODE = NO;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -293,7 +295,6 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.example.openttd";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -373,7 +374,6 @@
 				COPY_PHASE_STRIP = NO;
 				DEAD_CODE_STRIPPING = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = XXXXXXXXXX;
 				ENABLE_BITCODE = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -396,7 +396,6 @@
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
-				PRODUCT_BUNDLE_IDENTIFIER = "com.example.openttd";
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";

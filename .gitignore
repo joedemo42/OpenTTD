@@ -5,3 +5,4 @@
 /ios-deps/artifacts/
 /ios/BUILD_NUMBER
 xcuserdata/
+/build.config

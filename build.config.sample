@@ -1,0 +1,12 @@
+# Copy to build.config (not tracked) and fill in. One KEY=value per line, no quotes.
+
+# Home screen name of the app.
+APP_NAME=
+# Bundle identifier, e.g. com.example.openttd.
+BUNDLE_ID=
+# Apple Developer team ID for signing device builds (Xcode → Settings → Accounts).
+TEAM_ID=
+# App icon: 1024x1024 PNG without alpha; relative paths start at the repository root.
+ICON=
+# ios/build.sh upload posts the IPA and its release notes here (multipart fields file, notes).
+REPO_SERVER_URL=

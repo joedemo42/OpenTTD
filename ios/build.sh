@@ -14,7 +14,6 @@ ARCHIVE_DIR="$REPO_ROOT/archive"
 BUILD_NUMBER_FILE="$IOS_DIR/BUILD_NUMBER"
 PROJECT="$IOS_DIR/OpenTTD.xcodeproj"
 SCHEME="OpenTTD"
-BUNDLE_ID="com.example.openttd"
 DEFAULT_SIMULATOR="iPad Air 11-inch (M4)"
 DEFAULT_DEVICE="OldPad"
 IOS_MIN_VERSION="18.0"
@@ -27,7 +26,9 @@ SEED_DATA="$DATA_STAGE/SeedData"
 # Vendored third-party code linked into the engine: <directory in src/3rdparty>:<license file>.
 VENDORED_LICENSES="fmt:LICENSE.rst monocypher:LICENCE.md nlohmann:LICENSE.MIT openttd_social_integration_api:LICENSE squirrel:COPYRIGHT"
 IPA_DIR="$DERIVED_DATA/ipa"
-REPO_SERVER_URL="http://repo-server.invalid/upload/"
+APP_ICON_CATALOG="$DERIVED_DATA/AppIcon.xcassets"
+# Local app identity and upload server: APP_NAME, BUNDLE_ID, TEAM_ID, ICON, REPO_SERVER_URL.
+BUILD_CONFIG="$REPO_ROOT/build.config"
 
 script_name()
 {
@@ -45,6 +46,7 @@ Target: [simulator|device|both] | --simulator <name|UDID> | --device <name|UDID>
         Default: simulator "$DEFAULT_SIMULATOR"; the default device is "$DEFAULT_DEVICE".
 Configuration: --release (optimized, stripped, dSYM) for build, install, run, ipa, upload. Default: debug
         Slice = platform + configuration; both = simulator + device of the selected configuration.
+Settings: build.config (app name, bundle ID, team, icon, repo server); template: build.config.sample
 
 build     [simulator|device|both] [--release]
           Missing deps, engine and app; ios/BUILD_NUMBER +1 per invocation. Default: simulator
@@ -87,6 +89,18 @@ require_tool()
 	local tool
 	for tool in "$@"; do
 		command -v "$tool" >/dev/null 2>&1 || fail "required tool not found: $tool"
+	done
+}
+
+# Sets the named settings from build.config (KEY=value lines, # comments); a missing one stops with an error.
+require_settings()
+{
+	[[ -f "$BUILD_CONFIG" ]] || fail "build.config not found; copy build.config.sample to build.config and fill it in"
+	local key value
+	for key in "$@"; do
+		value="$(sed -n "s/^$key=//p" "$BUILD_CONFIG" | tail -n 1)"
+		[[ -n "$value" ]] || fail "build.config: $key is not set; see build.config.sample"
+		printf -v "$key" '%s' "$value"
 	done
 }
 
@@ -535,6 +549,25 @@ prepare_data()
 	echo "Staged $SEED_DATA"
 }
 
+# Stages build.config's ICON as the AppIcon catalog; unchanged files are kept so Xcode does not recompile.
+# ponytail: the icon is used as given (App Store Connect rejects alpha), never resized or flattened.
+stage_icon()
+{
+	local icon="$ICON"
+	[[ "$icon" == /* ]] || icon="$REPO_ROOT/$icon"
+	[[ -f "$icon" ]] || fail "build.config: ICON not found: $ICON"
+	local properties expected
+	properties="$(sips -g format -g pixelWidth -g pixelHeight -g hasAlpha "$icon" 2>/dev/null || true)"
+	for expected in 'format: png' 'pixelWidth: 1024' 'pixelHeight: 1024' 'hasAlpha: no'; do
+		grep -Fqx "  $expected" <<< "$properties" || fail "build.config: ICON must be a 1024x1024 PNG without alpha: $ICON"
+	done
+	local icon_set="$APP_ICON_CATALOG/AppIcon.appiconset"
+	local contents='{"images":[{"filename":"AppIcon.png","idiom":"universal","platform":"ios","size":"1024x1024"}],"info":{"author":"xcode","version":1}}'
+	mkdir -p "$icon_set"
+	[[ "$(cat "$icon_set/Contents.json" 2>/dev/null)" == "$contents" ]] || printf '%s\n' "$contents" > "$icon_set/Contents.json"
+	cmp -s "$icon" "$icon_set/AppIcon.png" || cp "$icon" "$icon_set/AppIcon.png"
+}
+
 generate_project()
 {
 	xcodegen --spec "$IOS_DIR/project.yml" --project "$IOS_DIR" \
@@ -577,11 +610,13 @@ xcode_build()
 		-configuration "$CONFIGURATION"
 		-derivedDataPath "$DERIVED_DATA"
 		-allowProvisioningUpdates
+		"PRODUCT_BUNDLE_IDENTIFIER=$BUNDLE_ID"
+		"APP_DISPLAY_NAME=$APP_NAME"
 	)
 	if [[ "$platform" == simulator ]]; then
 		arguments+=(-destination 'generic/platform=iOS Simulator' CODE_SIGNING_ALLOWED=NO)
 	else
-		arguments+=(-destination 'generic/platform=iOS')
+		arguments+=(-destination 'generic/platform=iOS' "DEVELOPMENT_TEAM=$TEAM_ID")
 	fi
 	# Release strips the product in place; a build without a relink would run dsymutil on the stripped binary.
 	[[ "$CONFIGURATION" == Debug ]] || rm -f "$(app_path "$platform")/OpenTTD"
@@ -595,7 +630,10 @@ build_app()
 	local target="$1"
 	local platforms platform
 	platforms="$(platforms_for "$target")"
-	require_tool cmake ninja lipo plutil shasum tar unzip xcodegen xcodebuild
+	require_tool cmake ninja lipo plutil shasum sips tar unzip xcodegen xcodebuild
+	require_settings APP_NAME BUNDLE_ID ICON
+	[[ " $platforms " != *" device "* ]] || require_settings TEAM_ID
+	stage_icon
 	next_build_number
 	echo "== OpenTTD build $BUILD_NUMBER ($target)"
 	mkdir -p "$DERIVED_DATA"
@@ -842,6 +880,7 @@ run_app()
 	[[ "$label" =~ ^[A-Za-z0-9._-]+$ ]] || usage_error "--label may only contain letters, digits, '.', '_' and '-'"
 	require_current_build "$PLATFORMS"
 	require_tool sips
+	require_settings BUNDLE_ID
 	mkdir -p "$LOG_DIR"
 	"run_$PLATFORMS" "$RUN_SECONDS" "$label"
 }
@@ -883,6 +922,7 @@ documents_zip()
 # Existing Documents files are kept on the simulator; CoreDevice merges directories.
 documents_install()
 {
+	require_settings BUNDLE_ID
 	local platform simulator=""
 	for platform in $PLATFORMS; do
 		require_current_build "$platform"
@@ -960,6 +1000,7 @@ create_ipa()
 upload_ipa()
 {
 	require_tool curl
+	require_settings REPO_SERVER_URL
 	[[ -z "$NOTES_FILE" || ( -f "$NOTES_FILE" && -r "$NOTES_FILE" ) ]] || fail "notes file not found or unreadable: $NOTES_FILE"
 	create_ipa signed
 	local archived="$ARCHIVE_DIR/$IPA_NAME"

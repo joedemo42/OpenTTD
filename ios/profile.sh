@@ -8,7 +8,7 @@ REPO_ROOT="$(cd "$IOS_DIR/.." && pwd)"
 LOG_DIR="$REPO_ROOT/log"
 PROFILE_DIR="$LOG_DIR/profile"
 BUILD="$IOS_DIR/build.sh"
-BUNDLE_ID="com.example.openttd"
+BUILD_CONFIG="$REPO_ROOT/build.config"
 DEFAULT_DEVICE="OldPad"
 DEFAULT_SIMULATOR="iPad Air 11-inch (M4)"
 WARM_UP=10
@@ -55,6 +55,18 @@ require_tool()
 	local tool
 	for tool in "$@"; do
 		command -v "$tool" >/dev/null 2>&1 || fail "required tool not found: $tool"
+	done
+}
+
+# Sets the named settings from build.config (KEY=value lines, # comments); a missing one stops with an error.
+require_settings()
+{
+	[[ -f "$BUILD_CONFIG" ]] || fail "build.config not found; copy build.config.sample to build.config and fill it in"
+	local key value
+	for key in "$@"; do
+		value="$(sed -n "s/^$key=//p" "$BUILD_CONFIG" | tail -n 1)"
+		[[ -n "$value" ]] || fail "build.config: $key is not set; see build.config.sample"
+		printf -v "$key" '%s' "$value"
 	done
 }
 
@@ -316,6 +328,7 @@ case "$command" in
 		for argument in "$@"; do
 			[[ "$argument" != -h && "$argument" != --help ]] || { usage; exit 0; }
 		done
+		require_settings BUNDLE_ID
 		if [[ "$command" == run ]]; then
 			profile_run "$@"
 		else

@@ -9,8 +9,7 @@ DERIVED_DATA="$REPO_ROOT/DerivedData"
 LOG_DIR="$REPO_ROOT/log"
 SOURCE_DIR="$REPO_ROOT/source"
 BUILD="$IOS_DIR/build.sh"
-BUNDLE_ID="com.example.openttd"
-TEAM_ID="XXXXXXXXXX"
+BUILD_CONFIG="$REPO_ROOT/build.config"
 DEFAULT_SIMULATOR="iPad Air 11-inch (M4)"
 HOST_TESTS="$DERIVED_DATA/OpenTTD-engine/host-tests"
 TIMGM6MB_SF2_SHA256="c5378b62028c920cb11e4803327983fee2f2cdff5dc89c708e39da417e51c854"
@@ -66,6 +65,18 @@ require_tool()
 	local tool
 	for tool in "$@"; do
 		command -v "$tool" >/dev/null 2>&1 || fail "required tool not found: $tool"
+	done
+}
+
+# Sets the named settings from build.config (KEY=value lines, # comments); a missing one stops with an error.
+require_settings()
+{
+	[[ -f "$BUILD_CONFIG" ]] || fail "build.config not found; copy build.config.sample to build.config and fill it in"
+	local key value
+	for key in "$@"; do
+		value="$(sed -n "s/^$key=//p" "$BUILD_CONFIG" | tail -n 1)"
+		[[ -n "$value" ]] || fail "build.config: $key is not set; see build.config.sample"
+		printf -v "$key" '%s' "$value"
 	done
 }
 
@@ -430,7 +441,7 @@ smoke_archive()
 	# Info.plist: identity, versions matching the IPA name, platform and the required capabilities.
 	require_plist "$plist" CFBundleIdentifier "$BUNDLE_ID"
 	require_plist "$plist" CFBundleExecutable OpenTTD
-	require_plist "$plist" CFBundleDisplayName OpenTTD
+	require_plist "$plist" CFBundleDisplayName "$APP_NAME"
 	require_plist "$plist" MinimumOSVersion 18.0
 	require_plist "$plist" CFBundleSupportedPlatforms.0 iPhoneOS
 	require_plist "$plist" UIDeviceFamily.0 1
@@ -663,6 +674,7 @@ case "$command" in
 		[[ $# -le 2 ]] || usage_error "archive takes at most one IPA"
 		[[ "${2:-}" != -h && "${2:-}" != --help ]] || { usage; exit 0; }
 		require_tool xcrun
+		require_settings APP_NAME BUNDLE_ID TEAM_ID
 		smoke_archive "${2:-}"
 		;;
 	app|multiplayer|lifecycle)
@@ -671,6 +683,7 @@ case "$command" in
 			[[ "$argument" != -h && "$argument" != --help ]] || { usage; exit 0; }
 		done
 		require_tool xcrun
+		require_settings BUNDLE_ID
 		"smoke_$command" "$@"
 		;;
 	*)

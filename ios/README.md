@@ -6,7 +6,7 @@ A native arm64 port for iOS/iPadOS 18 or later: SDL3 with its Metal renderer, Co
 
 - Apple silicon Mac with Xcode 26 or later (iOS 26 SDK) and its command line tools.
 - Host tools: CMake, Ninja, XcodeGen, curl, git (e.g. from Homebrew; nothing is linked against them).
-- A device build signs with automatic signing for team `XXXXXXXXXX`; change `DEVELOPMENT_TEAM` and `PRODUCT_BUNDLE_IDENTIFIER` in `ios/project.yml` for another team.
+- `build.config` in the repository root (not tracked): copy `build.config.sample` and fill in the app name, bundle ID, your Apple Developer team (device builds sign automatically with it), a 1024x1024 app icon PNG without alpha and, for `upload` only, the repo server URL.
 
 ## Sources and data
 
@@ -36,10 +36,6 @@ The pinned dependency sources (SDL3, zlib, xz, libpng, LZO, TimGM6mb) are downlo
 ./build-ios.sh upload --release --notes "…"   # archive/ + repo server, dSYM kept in archive/
 ./build-ios.sh documents zip                  # Documents payload for manual transfer
 ```
-
-## TestFlight
-
-`ios/testflight.sh upload` re-signs the current release device build (`./build-ios.sh build device --release`) for App Store distribution and uploads it with its dSYM through the Apple ID signed in to Xcode. The app declares its encryption exempt (`ITSAppUsesNonExemptEncryption = NO`). The App Store Connect app record, TestFlight test information, external groups and public links are set up on the App Store Connect website.
 
 Builds are incremental; `ios/BUILD_NUMBER` counts every build and is never reset.
 

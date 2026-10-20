@@ -43,7 +43,7 @@ int main(int argc, char *argv[])
 	}
 	SDL_Log("IOS_ENGINE DATA root=%s", OpenTTDIOSGetDocumentsPath());
 
-	SDL_SetAppMetadata("OpenTTD", "0.1", "com.example.openttd");
+	SDL_SetAppMetadata("OpenTTD", "0.1", NSBundle.mainBundle.bundleIdentifier.UTF8String);
 	SDL_SetHint(SDL_HINT_RENDER_DRIVER, "metal");
 	if (![NSUserDefaults.standardUserDefaults boolForKey:NOTICE_ACKNOWLEDGED_KEY]) SDL_AddEventWatch(ShowNoticeOnWindowShown, NULL);
 	SDL_Log("IOS_ENGINE START revision=%s", OpenTTDIOSGetEngineRevision());
