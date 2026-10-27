@@ -342,10 +342,14 @@ engine_arguments()
 	slice="$(slice_id "$sdk")"
 	# Debug apps keep the optimized engine (no debug info). Release uses upstream's release build type without its
 	# -g: the static engine reaches the app's dSYM as symbol table only.
+	# The prefix map makes __FILE__ and lambda names repo-relative, so the binary carries no build machine paths (debug
+	# info keeps them); the inner quotes keep a repo path with spaces in one piece on the compiler command line.
 	local build_type=Release
 	[[ "$CONFIGURATION" == Debug ]] || build_type=RelWithDebInfo
 	printf '%s\n' \
 		-DCMAKE_SYSTEM_NAME=iOS \
+		-DCMAKE_CXX_FLAGS="-fmacro-prefix-map=\"$REPO_ROOT/=\"" \
+		-DCMAKE_OBJCXX_FLAGS="-fmacro-prefix-map=\"$REPO_ROOT/=\"" \
 		-DCMAKE_OSX_SYSROOT="$(xcrun --sdk "$sdk" --show-sdk-path)" \
 		-DCMAKE_OSX_ARCHITECTURES=arm64 \
 		-DCMAKE_OSX_DEPLOYMENT_TARGET="$IOS_MIN_VERSION" \
