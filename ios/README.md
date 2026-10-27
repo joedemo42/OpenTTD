@@ -2,6 +2,8 @@
 
 A native arm64 port for iOS/iPadOS 18 or later: SDL3 with its Metal renderer, CoreText, an SDL3 sound driver, a native MIDI synthesizer and an NSURLSession HTTP backend. All dependencies are static; the app links only system frameworks.
 
+Step-by-step build guide: [BUILD-ME.md](BUILD-ME.md).
+
 ## Prerequisites
 
 - Apple silicon Mac with Xcode 26 or later (iOS 26 SDK) and its command line tools.

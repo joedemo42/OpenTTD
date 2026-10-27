@@ -17,7 +17,8 @@ curl -L -o Data/openmsx-0.4.2-all.zip https://cdn.openttd.org/openmsx-releases/0
 
 ```
 cp build.config.sample build.config
-# App icon: 1024x1024 PNG without transparency, here OpenTTD's logo on white
+# App icon: 1024x1024 PNG without transparency, here OpenTTD's logo on white.
+# The logo has transparent corners, and a direct PNG-to-PNG conversion keeps that transparency, so it goes through JPEG.
 sips -s format jpeg media/openttd.1024.png --out /tmp/openttd-icon.jpg
 sips -s format png /tmp/openttd-icon.jpg --out AppIcon.png
 ```
@@ -33,7 +34,7 @@ REPO_SERVER_URL=
 ```
 
 - `BUNDLE_ID`: any reverse-domain ID that is yours.
-- `TEAM_ID`: only for device builds. It's your Apple Developer team ID, shown in Xcode → Settings → Accounts. A free personal team works for your own devices (its profiles expire after 7 days).
+- `TEAM_ID`: only for device builds. It's your Apple Developer team ID: sign in to Xcode → Settings → Accounts with your Apple ID, then `defaults read com.apple.dt.Xcode IDEProvisioningTeamByIdentifier | grep -E 'teamID|teamName'` shows it. A free personal team works for your own devices (its profiles expire after 7 days).
 - `REPO_SERVER_URL`: leave it empty.
 
 ## 3. Build and install
@@ -53,6 +54,6 @@ Device (connected, trusted, with Developer Mode on):
 ./build-ios.sh install --device "<device name>" --release
 ```
 
-Then start OpenTTD from the home screen.
+With a free personal team, trust it once on the device: Settings → General → VPN & Device Management → your Apple ID → Trust. Then start OpenTTD from the home screen.
 
 The first build downloads and builds the dependencies and the engine, so it takes a while. Later builds are incremental. `./build-ios.sh --help` lists every command, and [README.md](README.md) has the details.
