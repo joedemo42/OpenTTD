@@ -16,6 +16,9 @@ docs/source/*
 /ios/BUILD_NUMBER
 xcuserdata/
 /build.config
+/Data/
+/log/
+/AppIcon.png
 
 # Tracked despite /build*
 !/build-ios.sh
