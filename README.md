@@ -1,6 +1,6 @@
 # OpenTTD
 
-> **Unofficial iOS/iPadOS port.** This branch adds an iPhone and iPad port to OpenTTD. It is not an official OpenTTD release and is not supported by the OpenTTD team, so please don't ask about it on the OpenTTD forums or issue tracker. Building, running and packaging the app: [ios/README.md](ios/README.md).
+> **Unofficial iOS/iPadOS port.** This branch adds an iPhone and iPad port to OpenTTD. It is not an official OpenTTD release and is not supported by the OpenTTD team, so please don't ask about it on the OpenTTD forums or issue tracker. Playing it on your iPhone or iPad: [install guide](https://joedev42.link/posts/play-openttd-on-172620615), app download under [Releases](https://github.com/joedemo42/OpenTTD/releases). Building, running and packaging the app: [ios/README.md](ios/README.md).
 
 ## Table of contents
 
