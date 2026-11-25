@@ -15,6 +15,9 @@
 
 #import <Foundation/Foundation.h>
 
+/** User defaults key of the bundled data stamp that Documents was last seeded from. */
+static NSString *const SEED_STAMP_KEY = @"SeedDataStamp";
+
 static bool SetError(char *buffer, size_t size, NSString *message)
 {
 	if (buffer != nullptr && size != 0 && ![message getCString:buffer maxLength:size encoding:NSUTF8StringEncoding]) buffer[0] = '\0';
@@ -37,7 +40,11 @@ const std::string &GetIOSDocumentsDirectory()
 	return path;
 }
 
-static bool CopySeedDirectory(NSFileManager *file_manager, NSURL *source, NSURL *destination, char *error_message, size_t error_message_size)
+/**
+ * Copy the bundled seed into Documents.
+ * @param refresh Also replace files that already exist; otherwise only missing files are copied.
+ */
+static bool CopySeedDirectory(NSFileManager *file_manager, NSURL *source, NSURL *destination, bool refresh, char *error_message, size_t error_message_size)
 {
 	NSError *error = nil;
 	if (![file_manager createDirectoryAtURL:destination withIntermediateDirectories:YES attributes:nil error:&error]) {
@@ -55,16 +62,18 @@ static bool CopySeedDirectory(NSFileManager *file_manager, NSURL *source, NSURL 
 
 		NSURL *target = [destination URLByAppendingPathComponent:child.lastPathComponent isDirectory:is_directory.boolValue];
 		if (is_directory.boolValue) {
-			if (!CopySeedDirectory(file_manager, child, target, error_message, error_message_size)) return false;
+			if (!CopySeedDirectory(file_manager, child, target, refresh, error_message, error_message_size)) return false;
 			continue;
 		}
 
-		if ([file_manager fileExistsAtPath:target.path]) continue;
+		if (!refresh && [file_manager fileExistsAtPath:target.path]) continue;
 		NSURL *temporary = [destination URLByAppendingPathComponent:[NSString stringWithFormat:@".%@.%@", child.lastPathComponent, NSUUID.UUID.UUIDString]];
 		if (![file_manager copyItemAtURL:child toURL:temporary error:&error]) {
 			return SetError(error_message, error_message_size, error.localizedDescription);
 		}
-		if (![file_manager moveItemAtURL:temporary toURL:target error:&error]) {
+		/* rename() also replaces an outdated copy, atomically. */
+		if (rename(temporary.fileSystemRepresentation, target.fileSystemRepresentation) != 0) {
+			error = [NSError errorWithDomain:NSPOSIXErrorDomain code:errno userInfo:nil];
 			[file_manager removeItemAtURL:temporary error:nil];
 			return SetError(error_message, error_message_size, error.localizedDescription);
 		}
@@ -85,8 +94,16 @@ bool OpenTTDIOSPrepareDocuments(char *error_message, size_t error_message_size)
 		NSURL *seed = [NSBundle.mainBundle URLForResource:@"SeedData" withExtension:nil];
 		if (documents == nil) return SetError(error_message, error_message_size, @"Documents directory is unavailable");
 		if (seed == nil) return SetError(error_message, error_message_size, @"Bundled SeedData directory is unavailable");
+		NSURL *stamp_url = [NSBundle.mainBundle URLForResource:@"data" withExtension:@"stamp"];
+		NSString *stamp = stamp_url == nil ? nil : [NSString stringWithContentsOfURL:stamp_url encoding:NSUTF8StringEncoding error:nil];
+		if (stamp == nil) return SetError(error_message, error_message_size, @"Bundled data stamp is unavailable");
 
-		if (!CopySeedDirectory(file_manager, seed, documents, error_message, error_message_size)) return false;
+		/* The seed holds only the engine's own data (languages, base sets, scripts) and empty directories.
+		 * A build with other data replaces every seeded file, so an update never runs on stale data. */
+		NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
+		bool refresh = ![stamp isEqualToString:[defaults stringForKey:SEED_STAMP_KEY]];
+		if (!CopySeedDirectory(file_manager, seed, documents, refresh, error_message, error_message_size)) return false;
+		if (refresh) [defaults setObject:stamp forKey:SEED_STAMP_KEY];
 
 		NSArray<NSString *> *directories = @[
 			@"save/autosave", @"scenario/heightmap", @"baseset", @"newgrf", @"ai/library",

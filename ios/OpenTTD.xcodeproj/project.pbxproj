@@ -11,6 +11,7 @@
 		214A6DC82176901D5BD17D7C /* QuartzCore.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = F467F5B2CCA75C74DCCDF4A3 /* QuartzCore.framework */; };
 		2852C53F0A7FF8ED3144E925 /* CoreVideo.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = ECB3D60E56CD81218D5D22A8 /* CoreVideo.framework */; };
 		2A673900C8A63EE803FD3AFC /* UIKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DC2DF0381F53F3860267029C /* UIKit.framework */; };
+		2E8FD6763D4B26B1DFDB0B58 /* data.stamp in Resources */ = {isa = PBXBuildFile; fileRef = A50D4001BCC7D1069831CC34 /* data.stamp */; };
 		3813F0881D0665BC98B45898 /* Zlib.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7F944515AEEDF2B228EB6394 /* Zlib.xcframework */; };
 		3DCEB25157C4551881597F3E /* GameController.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = D5F6B776BA2176B5BBFB9317 /* GameController.framework */; };
 		47FC259F525CA895C749C3AD /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 529CE190AAD443096D95A69E /* Foundation.framework */; };
@@ -44,6 +45,7 @@
 		6F0A8C67C968A99B10D101F7 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		7F944515AEEDF2B228EB6394 /* Zlib.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = Zlib.xcframework; path = "../ios-deps/artifacts/Zlib.xcframework"; sourceTree = "<group>"; };
 		97123F94A793BC9D25F43D2B /* OpenTTDEngine.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = OpenTTDEngine.xcframework; path = "../DerivedData/OpenTTD-engine/OpenTTDEngine.xcframework"; sourceTree = "<group>"; };
+		A50D4001BCC7D1069831CC34 /* data.stamp */ = {isa = PBXFileReference; path = data.stamp; sourceTree = "<group>"; };
 		B31C015729C741BAB143EE42 /* LibLZMA.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = LibLZMA.xcframework; path = "../ios-deps/artifacts/LibLZMA.xcframework"; sourceTree = "<group>"; };
 		B78AB34339A4F930DB694AD1 /* SDL3.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = SDL3.xcframework; path = "../ios-deps/artifacts/SDL3.xcframework"; sourceTree = "<group>"; };
 		BE153EB4B342BA12B2284567 /* CoreText.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreText.framework; path = System/Library/Frameworks/CoreText.framework; sourceTree = SDKROOT; };
@@ -130,6 +132,7 @@
 		DFF8F242D15A894F14ACAF7C /* DataPackage */ = {
 			isa = PBXGroup;
 			children = (
+				A50D4001BCC7D1069831CC34 /* data.stamp */,
 				2840D3AACFB767C47D0F66E2 /* Manual */,
 				F6B4F02AA52F2D01E59C091F /* SeedData */,
 			);
@@ -223,6 +226,7 @@
 				B3E9DFD080FA6E56AC42EE91 /* Assets.xcassets in Resources */,
 				F43E4D2F6AD7CA02C2BA16F8 /* Manual in Resources */,
 				6F1B8A53286452D5E8B8906A /* SeedData in Resources */,
+				2E8FD6763D4B26B1DFDB0B58 /* data.stamp in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

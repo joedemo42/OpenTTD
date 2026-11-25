@@ -59,6 +59,8 @@ targets:
       - path: ../DerivedData/DataPackage/SeedData
         type: folder
         buildPhase: resources
+      - path: ../DerivedData/DataPackage/data.stamp
+        buildPhase: resources
       - path: ../DerivedData/DataPackage/Manual
         type: folder
         buildPhase: resources

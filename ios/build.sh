@@ -484,7 +484,8 @@ stage_manual()
 # Stages the Documents payload (bundled as SeedData): pinned base sets as released,
 # expanded OpenMSX, TimGM6mb with its licenses, generated languages, built-in media
 # and AI/GS compatibility scripts. Content-addressed; never a Documents/OpenTTD wrapper.
-# The Manual (stage_manual) is staged with it but stays in the bundle.
+# The Manual (stage_manual) is staged with it but stays in the bundle. data.stamp is bundled
+# too: when it changes, the app replaces the seeded files in Documents.
 prepare_data()
 {
 	local language_dir
@@ -592,6 +593,7 @@ verify_bundled_data()
 	[[ -f "$app/SeedData/baseset/timgm6mb/LICENSE.txt" ]] || fail "built app is missing the TimGM6mb copyright notice"
 	[[ -f "$app/SeedData/baseset/timgm6mb/COPYING.md" ]] || fail "built app is missing the TimGM6mb GPL-2 license"
 	[[ ! -e "$app/SeedData/README.md" ]] || fail "bundled SeedData contains the Manual"
+	[[ -s "$app/data.stamp" ]] || fail "built app is missing the bundled data stamp"
 	local file
 	for file in README.md COPYING.md changelog.md known-bugs.md docs/fonts.md \
 		licenses/sdl3/LICENSE.txt licenses/zlib/LICENSE licenses/xz/COPYING licenses/xz/COPYING.0BSD \

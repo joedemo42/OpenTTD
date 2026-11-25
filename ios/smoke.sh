@@ -245,6 +245,11 @@ smoke_app()
 			timgm6mb/TimGM6mb.sf2 timgm6mb/LICENSE.txt timgm6mb/COPYING.md; do
 			[[ -f "$documents/baseset/$file" ]] || fail "$file was not seeded into Documents/baseset"
 		done
+		local seed
+		seed="$(xcrun simctl get_app_container "$simulator" "$BUNDLE_ID" app)/SeedData"
+		while IFS= read -r file; do
+			cmp -s "$seed/$file" "$documents/$file" || fail "Documents/$file is not the bundled one"
+		done < <(cd "$seed" && find . -type f | sed 's#^\./##')
 	fi
 	echo "App smoke test passed on the $platform ($seconds s); evidence is in log/debugger.log and log/smoke.*"
 }
