@@ -13,11 +13,11 @@
 
 #include "../../debug.h"
 #include "../../rev.h"
-#include "../network_internal.h"
 
 #include "http.h"
 #include "http_policy.h"
 #include "http_shared.h"
+#include "network_game_info.h"
 
 #include <atomic>
 #include <chrono>
@@ -91,7 +91,7 @@ static std::shared_ptr<NetworkHTTPRequest> FindRequest(NSURLSessionTask *task)
 		NSHTTPURLResponse *http_response = [response isKindOfClass:NSHTTPURLResponse.class] ? (NSHTTPURLResponse *)response : nil;
 		request->status_code = http_response != nil ? http_response.statusCode : 0;
 		request->response_failed = http_response == nil || OpenTTDHTTP::IsErrorStatus(request->status_code);
-		Debug(net, 3, "HTTP request status code: {}", request->status_code);
+		Debug(Facility::Net, Severity::Notice, "HTTP request status code: {}", request->status_code);
 		completion_handler(request->response_failed ? NSURLSessionResponseCancel : NSURLSessionResponseAllow);
 	}
 }
@@ -103,7 +103,7 @@ static std::shared_ptr<NetworkHTTPRequest> FindRequest(NSURLSessionTask *task)
 		auto request = FindRequest(task);
 		if (request == nullptr || data.length == 0) return;
 
-		Debug(net, 6, "HTTP callback: {} bytes", data.length);
+		Debug(Facility::Net, Severity::Debug2, "HTTP callback: {} bytes", data.length);
 		auto buffer = std::make_unique<char[]>(data.length);
 		[data getBytes:buffer.get() length:data.length];
 		request->received_bytes += data.length;
@@ -123,13 +123,13 @@ static std::shared_ptr<NetworkHTTPRequest> FindRequest(NSURLSessionTask *task)
 		}
 		if (!IsHTTPURL(new_request.URL)) {
 			request->response_failed = true;
-			Debug(net, 0, "HTTP request failed: redirect URL is not HTTP(S)");
+			Debug(Facility::Net, Severity::Critical, "HTTP request failed: redirect URL is not HTTP(S)");
 			completion_handler(nil);
 			return;
 		}
 		if (!OpenTTDHTTP::AllowRedirect(++request->redirect_count)) {
 			request->response_failed = true;
-			Debug(net, 0, "HTTP request failed: too many redirects");
+			Debug(Facility::Net, Severity::Critical, "HTTP request failed: too many redirects");
 			completion_handler(nil);
 			return;
 		}
@@ -148,11 +148,11 @@ static std::shared_ptr<NetworkHTTPRequest> FindRequest(NSURLSessionTask *task)
 			/* Serialize terminal queueing with the finished-and-empty removal check. */
 			std::lock_guard<std::mutex> lock(_http_mutex);
 			if (error == nil && !request->response_failed) {
-				Debug(net, 1, "HTTP request succeeded: method={}, status={}, bytes={}", request->is_post ? "POST" : "GET", request->status_code, request->received_bytes.load());
+				Debug(Facility::Net, Severity::Error, "HTTP request succeeded: method={}, status={}, bytes={}", request->is_post ? "POST" : "GET", request->status_code, request->received_bytes.load());
 				request->callback.OnReceiveData(nullptr, 0);
 			} else {
 				const bool quiet = request->callback.cancelled || _http_shutting_down || request->status_code == HTTP_429_TOO_MANY_REQUESTS;
-				Debug(net, quiet ? 1 : 0, "HTTP request failed: status_code={}, error={}", request->status_code, error != nil ? error.localizedDescription.UTF8String : "HTTP status");
+				Debug(Facility::Net, quiet ? Severity::Error : Severity::Critical, "HTTP request failed: status_code={}, error={}", request->status_code, error != nil ? error.localizedDescription.UTF8String : "HTTP status");
 				request->callback.OnFailure();
 			}
 			/* Publish completion only after its terminal callback is safely queued. */
@@ -188,7 +188,7 @@ static std::shared_ptr<NetworkHTTPRequest> FindRequest(NSURLSessionTask *task)
 		NSURL *url = components.URL;
 		if (!IsHTTPURL(url)) {
 			[uri_string release];
-			Debug(net, 0, "HTTP request failed: invalid URL");
+			Debug(Facility::Net, Severity::Critical, "HTTP request failed: invalid URL");
 			callback->OnFailure();
 			return;
 		}
@@ -211,7 +211,7 @@ static std::shared_ptr<NetworkHTTPRequest> FindRequest(NSURLSessionTask *task)
 			_http_requests.push_back(request);
 		}
 
-		Debug(net, 1, "HTTP {} request to {}", is_post ? "POST" : "GET", uri);
+		Debug(Facility::Net, Severity::Error, "HTTP {} request to {}", is_post ? "POST" : "GET", uri);
 		[request->task resume];
 		[native_request release];
 		[uri_string release];
@@ -251,7 +251,7 @@ void NetworkHTTPInitialize()
 		configuration.HTTPMaximumConnectionsPerHost = 4;
 		configuration.requestCachePolicy = NSURLRequestReloadIgnoringLocalCacheData;
 		_http_session = [[NSURLSession sessionWithConfiguration:configuration delegate:_http_delegate delegateQueue:_http_delegate_queue] retain];
-		Debug(net, 1, "IOS_HTTP READY backend=nsurlsession tls=system");
+		Debug(Facility::Net, Severity::Error, "IOS_HTTP READY backend=nsurlsession tls=system");
 	}
 }
 
@@ -276,7 +276,7 @@ void NetworkHTTPUninitialize()
 
 	if (!invalidated) {
 		/* ponytail: shutdown waits at most ten seconds; an async engine shutdown could release these objects after invalidation instead of leaving process exit to reclaim them. */
-		Debug(net, 0, "HTTP session did not invalidate within 10 seconds");
+		Debug(Facility::Net, Severity::Critical, "HTTP session did not invalidate within 10 seconds");
 		return;
 	}
 

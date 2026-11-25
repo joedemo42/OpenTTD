@@ -14,6 +14,7 @@
 #include "../../town.h"
 #include "../../landscape_cmd.h"
 #include "../../station_cmd.h"
+#include "../../tilearea_airportlayout.h"
 
 #include "../../safeguards.h"
 
@@ -139,7 +140,7 @@
 	if (_settings_game.economy.station_noise_level) {
 		uint dist;
 		const auto &layout = as->layouts[0];
-		AirportGetNearestTown(as, layout.rotation, tile, AirportTileTableIterator(layout.tiles, tile), dist);
+		AirportGetNearestTown(as, layout.rotation, tile, AirportTileTableIterator{layout.tiles, tile, false}, dist);
 		return GetAirportNoiseLevelForDistance(as, dist);
 	}
 
@@ -156,7 +157,7 @@
 
 	uint dist;
 	const auto &layout = as->layouts[0];
-	return AirportGetNearestTown(as, layout.rotation, tile, AirportTileTableIterator(layout.tiles, tile), dist)->index;
+	return AirportGetNearestTown(as, layout.rotation, tile, AirportTileTableIterator{layout.tiles, tile, false}, dist)->index;
 }
 
 /* static */ SQInteger ScriptAirport::GetMaintenanceCostFactor(AirportType type)

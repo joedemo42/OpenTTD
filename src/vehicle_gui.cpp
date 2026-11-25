@@ -13,6 +13,7 @@
 #include "gui.h"
 #include "textbuf_gui.h"
 #include "command_func.h"
+#include "vehicle_gui.h"
 #include "vehicle_gui_base.h"
 #include "viewport_func.h"
 #include "newgrf_text.h"
@@ -221,7 +222,7 @@ void BaseVehicleListWindow::BuildVehicleList()
 {
 	if (!this->vehgroups.NeedRebuild()) return;
 
-	Debug(misc, 3, "Building vehicle list type {} for company {} given index {}", this->vli.type, this->vli.company, this->vli.index);
+	Debug(Facility::Misc, Severity::Notice, "Building vehicle list type {} for company {} given index {}", this->vli.type, this->vli.company, this->vli.index);
 
 	this->vehgroups.clear();
 
@@ -2246,7 +2247,7 @@ public:
 		if (this->vehgroups.NeedResort()) {
 			StationID station = (this->vli.type == VehicleListType::Station) ? this->vli.ToStationID() : StationID::Invalid();
 
-			Debug(misc, 3, "Periodic resort {} list company {} at station {}", this->vli.vtype, this->owner, station);
+			Debug(Facility::Misc, Severity::Notice, "Periodic resort {} list company {} at station {}", this->vli.vtype, this->owner, station);
 			this->SetDirty();
 		}
 	}
@@ -2351,8 +2352,7 @@ void ShowVehicleListWindow(CompanyID company, VehicleType vehicle_type, TileInde
 
 static_assert(WID_VD_DETAILS_CARGO_CARRIED    == WID_VD_DETAILS_CARGO_CARRIED + TDW_TAB_CARGO   );
 static_assert(WID_VD_DETAILS_TRAIN_VEHICLES   == WID_VD_DETAILS_CARGO_CARRIED + TDW_TAB_INFO    );
-static_assert(WID_VD_DETAILS_CAPACITY_OF_EACH == WID_VD_DETAILS_CARGO_CARRIED + TDW_TAB_CAPACITY);
-static_assert(WID_VD_DETAILS_TOTAL_CARGO      == WID_VD_DETAILS_CARGO_CARRIED + TDW_TAB_TOTALS  );
+static_assert(WID_VD_DETAILS_TOTALS           == WID_VD_DETAILS_CARGO_CARRIED + TDW_TAB_TOTALS  );
 
 /** Vehicle details widgets (other than train). */
 static constexpr std::initializer_list<NWidgetPart> _nested_nontrain_vehicle_details_widgets = {
@@ -2405,10 +2405,8 @@ static constexpr std::initializer_list<NWidgetPart> _nested_train_vehicle_detail
 				SetStringTip(STR_VEHICLE_DETAIL_TAB_CARGO, STR_VEHICLE_DETAILS_TRAIN_CARGO_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_VD_DETAILS_TRAIN_VEHICLES), SetMinimalSize(99, 12),
 				SetStringTip(STR_VEHICLE_DETAIL_TAB_INFORMATION, STR_VEHICLE_DETAILS_TRAIN_INFORMATION_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
-		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_VD_DETAILS_CAPACITY_OF_EACH), SetMinimalSize(99, 12),
-				SetStringTip(STR_VEHICLE_DETAIL_TAB_CAPACITIES, STR_VEHICLE_DETAILS_TRAIN_CAPACITIES_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
-		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_VD_DETAILS_TOTAL_CARGO), SetMinimalSize(99, 12),
-				SetStringTip(STR_VEHICLE_DETAIL_TAB_TOTAL_CARGO, STR_VEHICLE_DETAILS_TRAIN_TOTAL_CARGO_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
+		NWidget(WWT_PUSHTXTBTN, Colours::Grey, WID_VD_DETAILS_TOTALS), SetMinimalSize(99, 12),
+				SetStringTip(STR_VEHICLE_DETAIL_TAB_TOTALS, STR_VEHICLE_DETAILS_TRAIN_TOTALS_TOOLTIP), SetFill(1, 0), SetResize(1, 0),
 		NWidget(WWT_RESIZEBOX, Colours::Grey),
 	EndContainer(),
 };
@@ -2589,17 +2587,12 @@ struct VehicleDetailsWindow : Window {
 
 	/**
 	 * Draw the details for the given vehicle at the position of the Details windows
-	 *
-	 * @param v     current vehicle
-	 * @param r     the Rect to draw within
-	 * @param vscroll_pos Position of scrollbar (train only)
-	 * @param vscroll_cap Number of lines currently displayed (train only)
-	 * @param det_tab Selected details tab (train only)
+	 * @param v current vehicle.
+	 * @param r the Rect to draw within.
 	 */
-	static void DrawVehicleDetails(const Vehicle *v, const Rect &r, int vscroll_pos, uint vscroll_cap, TrainDetailsWindowTabs det_tab)
+	static void DrawVehicleDetails(const Vehicle *v, const Rect &r)
 	{
 		switch (v->type) {
-			case VehicleType::Train: DrawTrainDetails(Train::From(v), r, vscroll_pos, vscroll_cap, det_tab); break;
 			case VehicleType::Road: DrawRoadVehDetails(v, r); break;
 			case VehicleType::Ship: DrawShipDetails(v, r); break;
 			case VehicleType::Aircraft: DrawAircraftDetails(Aircraft::From(v), r); break;
@@ -2676,7 +2669,7 @@ struct VehicleDetailsWindow : Window {
 
 			case WID_VD_MATRIX: {
 				/* For trains only. */
-				DrawVehicleDetails(v, r.Shrink(WidgetDimensions::scaled.matrix, RectPadding::zero).WithHeight(this->resize.step_height), this->vscroll->GetPosition(), this->vscroll->GetCapacity(), this->tab);
+				DrawTrainDetails(Train::From(v), r.WithHeight(this->resize.step_height), this->vscroll->GetPosition(), this->vscroll->GetCapacity(), this->tab);
 				break;
 			}
 
@@ -2694,7 +2687,7 @@ struct VehicleDetailsWindow : Window {
 					DrawVehicleImage(v, sr.WithHeight(ScaleGUITrad(GetVehicleHeight(v->type)), false), VehicleID::Invalid(), EngineImageType::InDetails, 0);
 				}
 
-				DrawVehicleDetails(v, tr.Indent(sprite_width, rtl), 0, 0, this->tab);
+				DrawVehicleDetails(v, tr.Indent(sprite_width, rtl));
 				break;
 			}
 
@@ -2776,13 +2769,11 @@ struct VehicleDetailsWindow : Window {
 
 			case WID_VD_DETAILS_CARGO_CARRIED:
 			case WID_VD_DETAILS_TRAIN_VEHICLES:
-			case WID_VD_DETAILS_CAPACITY_OF_EACH:
-			case WID_VD_DETAILS_TOTAL_CARGO:
+			case WID_VD_DETAILS_TOTALS:
 				this->SetWidgetsLoweredState(false,
 					WID_VD_DETAILS_CARGO_CARRIED,
 					WID_VD_DETAILS_TRAIN_VEHICLES,
-					WID_VD_DETAILS_CAPACITY_OF_EACH,
-					WID_VD_DETAILS_TOTAL_CARGO);
+					WID_VD_DETAILS_TOTALS);
 
 				this->tab = (TrainDetailsWindowTabs)(widget - WID_VD_DETAILS_CARGO_CARRIED);
 				this->SetDirty();

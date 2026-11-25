@@ -11,10 +11,7 @@
 #include "../void_map.h"
 #include "../signs_base.h"
 #include "../depot_base.h"
-#include "../fios.h"
-#include "../gamelog_internal.h"
 #include "../network/network.h"
-#include "../network/network_func.h"
 #include "../gfxinit.h"
 #include "../viewport_func.h"
 #include "../viewport_kdtree.h"
@@ -28,6 +25,7 @@
 #include "../roadveh_cmd.h"
 #include "../train.h"
 #include "../station_base.h"
+#include "../station_func.h"
 #include "../waypoint_base.h"
 #include "../roadstop_base.h"
 #include "../tunnelbridge_map.h"
@@ -35,10 +33,10 @@
 #include "../elrail_func.h"
 #include "../signs_func.h"
 #include "../aircraft.h"
-#include "../object_map.h"
 #include "../object_base.h"
 #include "../tree_map.h"
 #include "../company_func.h"
+#include "../company_manager_face.h"
 #include "../road_cmd.h"
 #include "../ai/ai.hpp"
 #include "../script/script_gui.h"
@@ -46,11 +44,9 @@
 #include "../town.h"
 #include "../economy_base.h"
 #include "../animated_tile_map.h"
-#include "../animated_tile_func.h"
 #include "../subsidy_base.h"
 #include "../subsidy_func.h"
 #include "../newgrf.h"
-#include "../newgrf_station.h"
 #include "../engine_func.h"
 #include "../rail_gui.h"
 #include "../core/backup_type.hpp"
@@ -60,13 +56,14 @@
 #include "../error.h"
 #include "../disaster_vehicle.h"
 #include "../ship.h"
-#include "../water.h"
 #include "../timer/timer.h"
 #include "../timer/timer_game_calendar.h"
 #include "../timer/timer_game_economy.h"
 #include "../timer/timer_game_tick.h"
 #include "../picker_func.h"
 
+#include "saveload_error.hpp"
+#include "saveload_func.h"
 #include "saveload_internal.h"
 
 #include <signal.h>
@@ -585,8 +582,8 @@ bool AfterLoadGame()
 	if (IsSavegameVersionBefore(SaveLoadVersion::PauseModes)) {
 		_pause_mode = (_pause_mode.base() == 2) ? PauseMode::Normal : PauseModes{};
 	} else if (_network_dedicated && _pause_mode.Test(PauseMode::Error)) {
-		Debug(net, 0, "The loading savegame was paused due to an error state");
-		Debug(net, 0, "  This savegame cannot be used for multiplayer");
+		Debug(Facility::Net, Severity::Critical, "The loading savegame was paused due to an error state");
+		Debug(Facility::Net, Severity::Critical, "  This savegame cannot be used for multiplayer");
 		/* Restore the signals */
 		ResetSignalHandlers();
 		return false;
@@ -941,7 +938,7 @@ bool AfterLoadGame()
 				if (!IsBuoy(t) && bst->owner != GetTileOwner(t)) SlErrorCorrupt("Wrong owner for station tile");
 
 				/* Set up station spread */
-				bst->rect.BeforeAddTile(t, StationRect::ADD_FORCE);
+				bst->spread.Add(t);
 
 				/* Waypoints don't have road stops/oil rigs in the old format */
 				if (!Station::IsExpected(bst)) break;
@@ -2403,7 +2400,7 @@ bool AfterLoadGame()
 			/* At some point, invalid depots were saved into the game (possibly those removed in the past?)
 			 * Remove them here, so they don't cause issues further down the line */
 			if (!IsDepotTile(tile)) {
-				Debug(sl, 0, "Removing invalid depot {} at {}, {}", d->index, TileX(d->xy), TileY(d->xy));
+				Debug(Facility::Sl, Severity::Critical, "Removing invalid depot {} at {}, {}", d->index, TileX(d->xy), TileY(d->xy));
 				delete d;
 				d = nullptr;
 				continue;
@@ -3434,7 +3431,7 @@ bool AfterLoadGame()
 	AfterLoadCompanyStats();
 	AfterLoadStoryBook();
 
-	_gamelog.PrintDebug(1);
+	_gamelog.PrintDebug(Severity::Error);
 
 	InitializeWindowsAndCaches();
 	/* Restore the signals */

@@ -15,13 +15,13 @@
 #include "strings_func.h"
 #include "timetable.h"
 #include "vehicle_func.h"
+#include "vehicle_gui.h"
 #include "depot_base.h"
 #include "core/pool_func.hpp"
 #include "aircraft.h"
 #include "roadveh.h"
 #include "station_base.h"
 #include "waypoint_base.h"
-#include "company_base.h"
 #include "order_backup.h"
 #include "cheat_type.h"
 #include "order_cmd.h"
@@ -505,7 +505,7 @@ void OrderList::DebugCheckSanity() const
 	TimerGameTick::Ticks check_timetable_duration = 0;
 	TimerGameTick::Ticks check_total_duration = 0;
 
-	Debug(misc, 6, "Checking OrderList {} for sanity...", this->index);
+	Debug(Facility::Misc, Severity::Debug2, "Checking OrderList {} for sanity...", this->index);
 
 	for (const Order &o : this->orders) {
 		++check_num_orders;
@@ -523,7 +523,7 @@ void OrderList::DebugCheckSanity() const
 		assert(v->orders == this);
 	}
 	assert(this->num_vehicles == check_num_vehicles);
-	Debug(misc, 6, "... detected {} orders ({} manual), {} vehicles, {} timetabled, {} total",
+	Debug(Facility::Misc, Severity::Debug2, "... detected {} orders ({} manual), {} vehicles, {} timetabled, {} total",
 			(uint)this->GetNumOrders(), (uint)this->num_manual_orders,
 			this->num_vehicles, this->timetable_duration, this->total_duration);
 }

@@ -51,7 +51,7 @@ static void OpenBankFile(const std::string &filename)
 		/* Corrupt sample data? Just leave the allocated memory as those tell
 		 * there is no sound to play (size = 0 due to calloc). Not allocating
 		 * the memory disables valid NewGRFs that replace sounds. */
-		Debug(misc, 6, "Incorrect number of sounds in '{}', ignoring.", filename);
+		Debug(Facility::Misc, Severity::Debug2, "Incorrect number of sounds in '{}', ignoring.", filename);
 		return;
 	}
 
@@ -89,7 +89,7 @@ static bool SetBankSource(MixerChannel *mc, SoundEntry *sound, SoundID sound_id)
 
 void InitializeSound()
 {
-	Debug(misc, 1, "Loading sound effects...");
+	Debug(Facility::Misc, Severity::Error, "Loading sound effects...");
 	OpenBankFile(BaseSounds::GetUsedSet()->files[0].filename);
 }
 
@@ -122,7 +122,7 @@ static void StartSound(SoundID sound_id, float pan, uint volume)
 
 /** Volume scaling for each zoom level. */
 static constexpr EnumIndexArray<uint8_t, ZoomLevel, ZoomLevel::End> _vol_factor_by_zoom{
-	255, 255, 255, 190, 134, 8
+	255, 255, 255, 190, 134, 87
 };
 
 static const uint8_t _sound_base_vol[] = {
@@ -157,7 +157,6 @@ void SndCopyToPool()
 	for (uint i = 0; i < ORIGINAL_SAMPLE_COUNT; i++) {
 		sound[i] = _original_sounds[_sound_idx[i]];
 		sound[i].volume = _sound_base_vol[i];
-		sound[i].priority = 0;
 	}
 }
 
@@ -185,7 +184,6 @@ void ChangeSoundSet(int index)
 
 		*sound = _original_sounds[_sound_idx[i]];
 		sound->volume = _sound_base_vol[i];
-		sound->priority = 0;
 	}
 
 	InvalidateWindowData(WindowClass::GameOptions, GameOptionsWindowNumber::GameOptions, 0, true);

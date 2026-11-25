@@ -93,7 +93,7 @@ void SoundDriver_iOS::MainLoop()
 		this->callback_logged = true;
 	}
 	if (this->callback_failed.exchange(false, std::memory_order_relaxed)) {
-		Debug(driver, 0, "iOS: failed to feed the SDL3 audio stream");
+		Debug(Facility::Driver, Severity::Critical, "iOS: failed to feed the SDL3 audio stream");
 	}
 	if (this->route_changed.exchange(false, std::memory_order_relaxed) && this->stream != nullptr) {
 		SDL_AudioSpec output{};

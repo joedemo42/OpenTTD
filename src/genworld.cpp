@@ -20,11 +20,9 @@
 #include "network/network.h"
 #include "heightmap.h"
 #include "viewport_func.h"
-#include "timer/timer_game_calendar.h"
 #include "timer/timer_game_tick.h"
 #include "engine_func.h"
 #include "water.h"
-#include "video/video_driver.hpp"
 #include "tilehighlight_func.h"
 #include "saveload/saveload_func.h"
 #include "void_map.h"
@@ -39,8 +37,6 @@
 #include "game/game_instance.hpp"
 #include "newgrf_railtype.h"
 #include "newgrf_roadtype.h"
-#include "string_func.h"
-#include "thread.h"
 #include "tgp.h"
 
 #include "table/strings.h"
@@ -102,7 +98,7 @@ static void _GenerateWorld()
 
 	try {
 		_generating_world = true;
-		if (_network_dedicated) Debug(net, 3, "Generating map, please wait...");
+		if (_network_dedicated) Debug(Facility::Net, Severity::Notice, "Generating map, please wait...");
 		/* Set the Random() seed to generation_seed so we produce the same map with the same seed */
 		_random.SetSeed(_settings_game.game_creation.generation_seed);
 		SetGeneratingWorldProgress(GenWorldProgress::Init, 2);
@@ -212,10 +208,10 @@ static void _GenerateWorld()
 
 		ShowNewGRFError();
 
-		if (_network_dedicated) Debug(net, 3, "Map generated, starting game");
-		Debug(desync, 1, "new_map: {:08x}", _settings_game.game_creation.generation_seed);
+		if (_network_dedicated) Debug(Facility::Net, Severity::Notice, "Map generated, starting game");
+		Debug(Facility::Desync, Severity::Error, "new_map: {:08x}", _settings_game.game_creation.generation_seed);
 
-		if (_debug_desync_level > 0) {
+		if (IsVisibleSeverity(Facility::Desync, Severity::Error)) {
 			std::string name = fmt::format("dmp_cmds_{:08x}_{:08x}.sav", _settings_game.game_creation.generation_seed, TimerGameEconomy::date);
 			SaveOrLoad(name, SaveLoadOperation::Save, DetailedFileType::GameFile, Subdirectory::Autosave, false);
 		}
@@ -227,7 +223,7 @@ static void _GenerateWorld()
 
 		if (_network_dedicated) {
 			/* Exit the game to prevent a return to main menu.  */
-			Debug(net, 0, "Generating map failed; closing server");
+			Debug(Facility::Net, Severity::Critical, "Generating map failed; closing server");
 			_exit_game = true;
 		} else {
 			SwitchToMode(_switch_mode);
@@ -309,7 +305,7 @@ void GenerateWorld(GenWorldMode mode, uint size_x, uint size_y, bool reset_setti
 	InitializeGame(GenWorldInfo::size_x, GenWorldInfo::size_y, true, reset_settings);
 	PrepareGenerateWorldProgress();
 
-	if (_settings_game.construction.map_height_limit == 0) {
+	if (_settings_game.construction.map_height_limit == 0 || GenWorldInfo::mode == GWM_HEIGHTMAP) {
 		uint estimated_height = 0;
 
 		if (GenWorldInfo::mode == GWM_EMPTY && _game_mode != GameMode::Menu) {

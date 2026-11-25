@@ -30,6 +30,7 @@
 #include "road_cmd.h"
 #include "landscape.h"
 #include "querystring_gui.h"
+#include "textbuf_gui.h"
 #include "window_func.h"
 #include "townname_func.h"
 #include "core/backup_type.hpp"
@@ -491,6 +492,7 @@ public:
 
 			case WID_TV_CATCHMENT:
 				SetViewportCatchmentTown(Town::Get(this->window_number), !this->IsWidgetLowered(WID_TV_CATCHMENT));
+				SndClickBeep();
 				break;
 
 			case WID_TV_EXPAND: // expand town - only available on Scenario editor

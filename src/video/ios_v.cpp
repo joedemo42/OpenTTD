@@ -245,7 +245,7 @@ bool VideoDriver_iOS::ToggleFullscreen(bool)
 void VideoDriver_iOS::ToggleVsync(bool vsync)
 {
 	if (this->renderer != nullptr && !SDL_SetRenderVSync(this->renderer, vsync ? 1 : SDL_RENDERER_VSYNC_DISABLED)) {
-		Debug(driver, 0, "iOS: could not {} vsync: {}", vsync ? "enable" : "disable", SDL_GetError());
+		Debug(Facility::Driver, Severity::Critical, "iOS: could not {} vsync: {}", vsync ? "enable" : "disable", SDL_GetError());
 	}
 }
 
@@ -259,7 +259,7 @@ void VideoDriver_iOS::EditBoxGainedFocus()
 	if (this->window == nullptr || this->edit_box_focused) return;
 	this->UpdateTextInputArea();
 	if (!SDL_StartTextInput(this->window)) {
-		Debug(driver, 0, "iOS: could not start text input: {}", SDL_GetError());
+		Debug(Facility::Driver, Severity::Critical, "iOS: could not start text input: {}", SDL_GetError());
 		return;
 	}
 	this->edit_box_focused = true;
@@ -271,7 +271,7 @@ void VideoDriver_iOS::EditBoxLostFocus()
 	if (this->window == nullptr || !this->edit_box_focused) return;
 	SDL_ClearComposition(this->window);
 	HandleTextInput({}, true);
-	if (!SDL_StopTextInput(this->window)) Debug(driver, 0, "iOS: could not stop text input: {}", SDL_GetError());
+	if (!SDL_StopTextInput(this->window)) Debug(Facility::Driver, Severity::Critical, "iOS: could not stop text input: {}", SDL_GetError());
 	this->edit_box_focused = false;
 	this->text_input_area_valid = false;
 	SDL_Log("IOS_INPUT IME focus=off");
@@ -539,7 +539,7 @@ void VideoDriver_iOS::UpdateTextInputArea()
 			area.w == this->text_input_area.w && area.h == this->text_input_area.h && cursor == this->text_input_cursor) return;
 
 	if (!SDL_SetTextInputArea(this->window, &area, cursor)) {
-		Debug(driver, 0, "iOS: could not set text input area: {}", SDL_GetError());
+		Debug(Facility::Driver, Severity::Critical, "iOS: could not set text input area: {}", SDL_GetError());
 		return;
 	}
 	this->text_input_area = area;
@@ -573,7 +573,7 @@ bool VideoDriver_iOS::PollEvent()
 		case SDL_EVENT_WINDOW_METAL_VIEW_RESIZED:
 		case SDL_EVENT_WINDOW_SAFE_AREA_CHANGED:
 			this->CancelTouchInput();
-			if (!this->UpdateLayout(false)) Debug(driver, 0, "iOS: failed to update window layout: {}", SDL_GetError());
+			if (!this->UpdateLayout(false)) Debug(Facility::Driver, Severity::Critical, "iOS: failed to update window layout: {}", SDL_GetError());
 			this->redraw_requested = true;
 			break;
 
@@ -712,7 +712,7 @@ void VideoDriver_iOS::Paint()
 	const Uint64 upload_start = SDL_GetTicksNS();
 	const uint32_t *pixels = this->framebuffer.data() + static_cast<size_t>(update.y) * _screen.pitch + update.x;
 	if (!SDL_UpdateTexture(this->texture, &update, pixels, _screen.pitch * sizeof(uint32_t))) {
-		Debug(driver, 0, "iOS: dirty texture upload failed: {}", SDL_GetError());
+		Debug(Facility::Driver, Severity::Critical, "iOS: dirty texture upload failed: {}", SDL_GetError());
 		return;
 	}
 	const Uint64 present_start = SDL_GetTicksNS();
@@ -724,7 +724,7 @@ void VideoDriver_iOS::Paint()
 		static_cast<float>(_screen.width), static_cast<float>(_screen.height),
 	};
 	if (!SDL_RenderTexture(this->renderer, this->texture, nullptr, &destination) || !SDL_RenderPresent(this->renderer)) {
-		Debug(driver, 0, "iOS: Metal presentation failed: {}", SDL_GetError());
+		Debug(Facility::Driver, Severity::Critical, "iOS: Metal presentation failed: {}", SDL_GetError());
 		return;
 	}
 	this->RecordFrame(paint_start, upload_start, present_start, SDL_GetTicksNS(), update.w * update.h);
@@ -744,7 +744,7 @@ void VideoDriver_iOS::Paint()
 /** Frame statistics for profiling, logged every 10 seconds with -d driver=2. All times in nanoseconds. */
 void VideoDriver_iOS::RecordFrame(Uint64 start, Uint64 upload_start, Uint64 present_start, Uint64 end, int pixels)
 {
-	if (_debug_driver_level < 2) return;
+	if (!IsVisibleSeverity(Facility::Driver, Severity::Warning)) return;
 
 	FrameStats &stats = this->frame_stats;
 	if (stats.since == 0) stats.since = start;
@@ -757,7 +757,7 @@ void VideoDriver_iOS::RecordFrame(Uint64 start, Uint64 upload_start, Uint64 pres
 	if (end - stats.since < SDL_NS_PER_SECOND * 10) return;
 
 	const double frames = stats.frames;
-	Debug(driver, 2, "iOS video: {:.1f} presents/s; per present: palette {:.2f} ms, upload {:.2f} ms, present {:.2f} ms (max {:.2f}), {:.2f} Mpixels",
+	Debug(Facility::Driver, Severity::Warning, "iOS video: {:.1f} presents/s; per present: palette {:.2f} ms, upload {:.2f} ms, present {:.2f} ms (max {:.2f}), {:.2f} Mpixels",
 			frames * SDL_NS_PER_SECOND / (end - stats.since), stats.palette / frames / SDL_NS_PER_MS, stats.upload / frames / SDL_NS_PER_MS,
 			stats.present / frames / SDL_NS_PER_MS, static_cast<double>(stats.present_max) / SDL_NS_PER_MS, stats.pixels / frames / 1e6);
 	stats = {};

@@ -12,13 +12,12 @@
 
 #include "network_content.h"
 #include "../window_gui.h"
-#include "../widgets/network_content_widget.h"
 
 /** Base window for showing the download status of content */
 class BaseNetworkContentDownloadStatusWindow : public Window, ContentCallback {
 protected:
-	uint total_bytes = 0; ///< Number of bytes to download
-	uint downloaded_bytes = 0; ///< Number of bytes downloaded
+	uint64_t total_bytes = 0; ///< Number of bytes to download
+	uint64_t downloaded_bytes = 0; ///< Number of bytes downloaded
 	uint total_files = 0; ///< Number of files to download
 	uint downloaded_files = 0; ///< Number of files downloaded
 
@@ -35,7 +34,7 @@ public:
 	void Close([[maybe_unused]] int data = 0) override;
 	void UpdateWidgetSize(WidgetID widget, Dimension &size, [[maybe_unused]] const Dimension &padding, [[maybe_unused]] Dimension &fill, [[maybe_unused]] Dimension &resize) override;
 	void DrawWidget(const Rect &r, WidgetID widget) const override;
-	void OnDownloadProgress(const ContentInfo &ci, int bytes) override;
+	void OnDownloadProgress(const ContentInfo &ci, int64_t bytes) override;
 };
 
 void BuildContentTypeStringList();

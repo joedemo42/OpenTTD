@@ -37,6 +37,7 @@
 #include "strings_func.h"
 #include "window_func.h"
 #include "company_func.h"
+#include "company_base.h"
 #include "rev.h"
 #include "error.h"
 #include "gamelog.h"
@@ -49,7 +50,6 @@
 #include "newgrf_badge_config.h"
 #include "base_media_base.h"
 #include "base_media_graphics.h"
-#include "fios.h"
 #include "fileio_func.h"
 #include "settings_cmd.h"
 
@@ -981,7 +981,7 @@ static void AILoadConfig(const IniFile &ini, std::string_view grpname)
 		config->Change(item.name);
 		if (!config->HasScript()) {
 			if (item.name != "none") {
-				Debug(script, 0, "The AI by the name '{}' was no longer found, and removed from the list.", item.name);
+				Debug(Facility::Script, Severity::Critical, "The AI by the name '{}' was no longer found, and removed from the list.", item.name);
 				continue;
 			}
 		}
@@ -1008,7 +1008,7 @@ static void GameLoadConfig(const IniFile &ini, std::string_view grpname)
 	config->Change(item.name);
 	if (!config->HasScript()) {
 		if (item.name != "none") {
-			Debug(script, 0, "The GameScript by the name '{}' was no longer found, and removed from the list.", item.name);
+			Debug(Facility::Script, Severity::Critical, "The GameScript by the name '{}' was no longer found, and removed from the list.", item.name);
 			return;
 		}
 	}
@@ -2043,16 +2043,11 @@ void IConsoleListSettings(std::string_view prefilter)
 	IConsolePrint(CC_HELP, "Use 'setting' command to change a value.");
 }
 
-ScriptConfigSettings::ScriptConfigSettings()
-{
-	/* Instantiate here, because unique_ptr needs a complete type. */
-}
+/** Needs to be manually defined due to incomplete definition of types in the header. */
+ScriptConfigSettings::ScriptConfigSettings() = default;
 
 /** Needs to be manually defined due to incomplete definition of types in the header. */
-ScriptConfigSettings::~ScriptConfigSettings()
-{
-	/* Instantiate here, because unique_ptr needs a complete type. */
-}
+ScriptConfigSettings::~ScriptConfigSettings() = default;
 
 ScriptConfigSettings::ScriptConfigSettings(const ScriptConfigSettings &other)
 {

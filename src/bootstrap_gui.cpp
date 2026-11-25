@@ -16,7 +16,6 @@
 #if defined(WITH_FREETYPE) || defined(WITH_UNISCRIBE) || defined(WITH_CORETEXT)
 
 #include "core/geometry_func.hpp"
-#include "error.h"
 #include "fontcache.h"
 #include "gfx_func.h"
 #include "network/network.h"
@@ -27,6 +26,7 @@
 #include "window_func.h"
 
 #include "widgets/bootstrap_widget.h"
+#include "widgets/network_content_widget.h"
 
 #include "table/strings.h"
 
@@ -294,8 +294,8 @@ public:
 class BootstrapEmscripten : public ContentCallback {
 	bool downloading = false;
 	uint total_files = 0;
-	uint total_bytes = 0;
-	uint downloaded_bytes = 0;
+	uint64_t total_bytes = 0;
+	uint64_t downloaded_bytes = 0;
 
 public:
 	BootstrapEmscripten()
@@ -333,7 +333,7 @@ public:
 		EM_ASM({ if (window["openttd_bootstrap"]) openttd_bootstrap($0, $1); }, this->downloaded_bytes, this->total_bytes);
 	}
 
-	void OnDownloadProgress(const ContentInfo &, int bytes) override
+	void OnDownloadProgress(const ContentInfo &, int64_t bytes) override
 	{
 		/* A negative value means we are resetting; for example, when retrying or using a fallback. */
 		if (bytes < 0) {
@@ -381,7 +381,7 @@ bool HandleBootstrap()
 	/* Initialise the font cache. */
 	InitializeUnicodeGlyphMap();
 	/* Next "force" finding a suitable non-sprite font as the local font is missing. */
-	CheckForMissingGlyphs();
+	CheckForMissingGlyphs(FontSize::Normal);
 
 	/* Initialise the palette. The biggest step is 'faking' some recolour sprites.
 	 * This way the mauve and gray colours work and we can show the user interface. */

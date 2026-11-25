@@ -138,17 +138,17 @@ void MusicDriver_iOS::PlaySong(const MusicSongInfo &song)
 
 	const std::string filename = MidiFile::GetSMFFile(song);
 	if (filename.empty()) {
-		Debug(driver, 0, "iOS MIDI: failed to resolve song file");
+		Debug(Facility::Driver, Severity::Critical, "iOS MIDI: failed to resolve song file");
 		return;
 	}
 
 	OSStatus status = NewMusicSequence(&this->sequence);
 	if (status != noErr) {
-		Debug(driver, 0, "iOS MIDI: {}", AudioError("failed to create sequence", status));
+		Debug(Facility::Driver, Severity::Critical, "iOS MIDI: {}", AudioError("failed to create sequence", status));
 		return;
 	}
 	if ((status = MusicSequenceSetAUGraph(this->sequence, this->graph)) != noErr) {
-		Debug(driver, 0, "iOS MIDI: {}", AudioError("failed to attach audio graph", status));
+		Debug(Facility::Driver, Severity::Critical, "iOS MIDI: {}", AudioError("failed to attach audio graph", status));
 		this->StopSongLocked();
 		return;
 	}
@@ -156,14 +156,14 @@ void MusicDriver_iOS::PlaySong(const MusicSongInfo &song)
 	CFURLRef file_url = CFURLCreateFromFileSystemRepresentation(kCFAllocatorDefault,
 			reinterpret_cast<const UInt8 *>(filename.data()), filename.size(), false);
 	if (file_url == nullptr) {
-		Debug(driver, 0, "iOS MIDI: failed to create song URL");
+		Debug(Facility::Driver, Severity::Critical, "iOS MIDI: failed to create song URL");
 		this->StopSongLocked();
 		return;
 	}
 	status = MusicSequenceFileLoad(this->sequence, file_url, kMusicSequenceFile_AnyType, 0);
 	CFRelease(file_url);
 	if (status != noErr) {
-		Debug(driver, 0, "iOS MIDI: {}", AudioError("failed to load song", status));
+		Debug(Facility::Driver, Severity::Critical, "iOS MIDI: {}", AudioError("failed to load song", status));
 		this->StopSongLocked();
 		return;
 	}
@@ -201,7 +201,7 @@ void MusicDriver_iOS::PlaySong(const MusicSongInfo &song)
 	if (status == noErr) status = MusicPlayerSetTime(this->player, 0);
 	if (status == noErr && !this->backgrounded) status = MusicPlayerStart(this->player);
 	if (status != noErr) {
-		Debug(driver, 0, "iOS MIDI: {}", AudioError("failed to start song", status));
+		Debug(Facility::Driver, Severity::Critical, "iOS MIDI: {}", AudioError("failed to start song", status));
 		this->StopSongLocked();
 		return;
 	}
@@ -305,7 +305,7 @@ void MusicDriver_iOS::HandleLifecycleEvent(Uint32 event_type)
 			if (status == noErr && this->lifecycle_paused) status = MusicPlayerSetTime(this->player, this->paused_beat);
 			if (status == noErr && this->lifecycle_paused) status = MusicPlayerStart(this->player);
 			if (status != noErr) {
-				Debug(driver, 0, "iOS MIDI: {}", AudioError("failed to resume playback", status));
+				Debug(Facility::Driver, Severity::Critical, "iOS MIDI: {}", AudioError("failed to resume playback", status));
 				this->playing = false;
 			}
 			this->lifecycle_paused = false;

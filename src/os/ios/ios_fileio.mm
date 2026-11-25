@@ -29,7 +29,7 @@ void DetermineBasePaths(std::string_view)
 	AppendPathSeparator(documents);
 	_searchpaths[Searchpath::PersonalDir] = documents;
 	/* The working directory is Documents as well, so relative paths on the command line (-c, -g) resolve there. */
-	if (chdir(documents.c_str()) != 0) Debug(misc, 0, "Unable to change the working directory to {}", documents);
+	if (chdir(documents.c_str()) != 0) Debug(Facility::Misc, Severity::Critical, "Unable to change the working directory to {}", documents);
 	_searchpaths[Searchpath::WorkingDir] = documents;
 	_searchpaths[Searchpath::AutodownloadPersonalDir] = documents + "content_download" PATHSEP;
 

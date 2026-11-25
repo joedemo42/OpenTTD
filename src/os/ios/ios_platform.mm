@@ -114,13 +114,13 @@ void OSOpenBrowser(const std::string &url)
 		NSString *scheme = components.scheme.lowercaseString;
 		NSURL *target = components.URL;
 		if (target == nil || components.host.length == 0 || !([scheme isEqualToString:@"http"] || [scheme isEqualToString:@"https"])) {
-			Debug(misc, 1, "Refusing to open invalid browser URL: {}", url);
+			Debug(Facility::Misc, Severity::Error, "Refusing to open invalid browser URL: {}", url);
 			return;
 		}
 
 		dispatch_async(dispatch_get_main_queue(), ^{
 			[UIApplication.sharedApplication openURL:target options:@{} completionHandler:^(BOOL success) {
-				if (!success) Debug(misc, 1, "Unable to open browser URL");
+				if (!success) Debug(Facility::Misc, Severity::Error, "Unable to open browser URL");
 			}];
 		});
 	}
@@ -133,7 +133,7 @@ void BeginIOSBackgroundTask()
 {
 	if (_background_task != UIBackgroundTaskInvalid) return;
 	_background_task = [UIApplication.sharedApplication beginBackgroundTaskWithName:@"OpenTTD save" expirationHandler:^{
-		Debug(misc, 0, "iOS: background time expired before saving finished");
+		Debug(Facility::Misc, Severity::Critical, "iOS: background time expired before saving finished");
 		EndIOSBackgroundTask();
 	}];
 }

@@ -13,7 +13,6 @@
 #include "news_func.h"
 #include "newgrf_engine.h"
 #include "newgrf_sound.h"
-#include "error_func.h"
 #include "strings_func.h"
 #include "command_func.h"
 #include "window_func.h"
@@ -28,6 +27,7 @@
 #include "company_func.h"
 #include "effectvehicle_func.h"
 #include "station_base.h"
+#include "station_func.h"
 #include "engine_base.h"
 #include "core/random_func.hpp"
 #include "core/backup_type.hpp"
@@ -587,7 +587,7 @@ void HandleAircraftEnterHangar(Aircraft *v)
 
 static void PlayAircraftSound(const Vehicle *v)
 {
-	if (!PlayVehicleSound(v, VSE_START)) {
+	if (!PlayVehicleSound(v, VehicleSoundEvent::Start)) {
 		SndPlayVehicleFx(AircraftVehInfo(v->engine_type)->sfx, v);
 	}
 }
@@ -914,7 +914,7 @@ static bool AircraftController(Aircraft *v)
 		if (u->cur_speed > 32) {
 			v->cur_speed = 0;
 			if (--u->cur_speed == 32) {
-				if (!PlayVehicleSound(v, VSE_START)) {
+				if (!PlayVehicleSound(v, VehicleSoundEvent::Start)) {
 					SoundID sfx = AircraftVehInfo(v->engine_type)->sfx;
 					/* For compatibility with old NewGRF we ignore the sfx property, unless a NewGRF-defined sound is used.
 					 * The baseset has only one helicopter sound, so this only limits using plane or cow sounds. */
@@ -1449,7 +1449,7 @@ static void AircraftLandAirplane(Aircraft *v)
 
 	TriggerAirportTileAnimation(st, vt, AirportAnimationTrigger::AirplaneTouchdown);
 
-	if (!PlayVehicleSound(v, VSE_TOUCHDOWN)) {
+	if (!PlayVehicleSound(v, VehicleSoundEvent::Touchdown)) {
 		SndPlayVehicleFx(SND_17_SKID_PLANE, v);
 	}
 }
@@ -1823,7 +1823,7 @@ static bool AirportMove(Aircraft *v, const AirportFTAClass *apc)
 {
 	/* error handling */
 	if (v->pos >= apc->nofelements) {
-		Debug(misc, 0, "[Ap] position {} is not valid for current airport. Max position is {}", v->pos, apc->nofelements - 1);
+		Debug(Facility::Misc, Severity::Critical, "[Ap] position {} is not valid for current airport. Max position is {}", v->pos, apc->nofelements - 1);
 		assert(v->pos < apc->nofelements);
 	}
 
@@ -1862,7 +1862,7 @@ static bool AirportMove(Aircraft *v, const AirportFTAClass *apc)
 		current = current->next.get();
 	} while (current != nullptr);
 
-	Debug(misc, 0, "[Ap] cannot move further on Airport! (pos {} state {}) for vehicle {}", v->pos, v->state, v->index);
+	Debug(Facility::Misc, Severity::Critical, "[Ap] cannot move further on Airport! (pos {} state {}) for vehicle {}", v->pos, v->state, v->index);
 	NOT_REACHED();
 }
 
