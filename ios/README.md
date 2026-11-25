@@ -12,7 +12,7 @@ Step-by-step build guide: [BUILD-ME.md](BUILD-ME.md).
 
 ## Sources and data
 
-Branch `openttd-ios` of [joedemo42/OpenTTD](https://github.com/joedemo42/OpenTTD) is OpenTTD (upstream commit `ed04d336`, development after 16.0-beta2) with the port on top: engine changes are ordinary commits in the OpenTTD tree (`git diff ed04d336 openttd-ios -- CMakeLists.txt cmake src`), the app host and build scripts live in `ios/`, `ios-deps/` and `build-ios.sh`.
+Branch `openttd-ios` of [joedemo42/OpenTTD](https://github.com/joedemo42/OpenTTD) is OpenTTD (upstream branch `release/16` at `7abe5c43`, 16.0-RC1 with backports, plus 16 fixes cherry-picked from master) with the port on top: engine changes are ordinary commits in the OpenTTD tree (`git diff 7abe5c43 openttd-ios -- CMakeLists.txt cmake src`, which also shows the cherry-picked fixes), the app host and build scripts live in `ios/`, `ios-deps/` and `build-ios.sh`.
 
 ```
 git clone --branch openttd-ios https://github.com/joedemo42/OpenTTD
